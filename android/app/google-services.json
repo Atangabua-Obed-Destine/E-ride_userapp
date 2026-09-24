@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "471708002064",
+    "project_id": "e-ride-38f60",
+    "storage_bucket": "e-ride-38f60.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:471708002064:android:2af0d9164041f7d44b2795",
+        "android_client_info": {
+          "package_name": "com.i_nnova.eride"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCROGrra72pwhJvOOhZzQNCjkcES0Eau8g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
