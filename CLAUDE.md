@@ -117,8 +117,8 @@ authorized through the backend's broadcasting auth endpoint:
 | `private-driver-payment-received.{tripId}` | payment confirmed, then `ReviewScreen` |
 
 FCM (`lib/helper/notification_helper.dart`) is the out-of-app path for the same lifecycle events.
-Firebase Android options are **hardcoded in `main.dart`** (project `drivevalley-fdb7f`); iOS reads
-`GoogleService-Info.plist`.
+Firebase project `e-ride-38f60`: Android reads `android/app/google-services.json`, iOS reads
+`ios/GoogleService-Info.plist` (the copy Xcode bundles; `ios/Runner/` holds the same file).
 
 ### Configuration
 
