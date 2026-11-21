@@ -61,4 +61,5 @@ workflows:
           zip -qr "$CM_BUILD_DIR/eride-simulator.zip" Runner.app
     artifacts:
       - eride-simulator.zip
+      - build/ios/iphonesimulator/Runner.app
       - /tmp/xcodebuild_logs/*.log
