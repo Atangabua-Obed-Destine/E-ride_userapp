@@ -187,6 +187,23 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
                         : Text(quote != null && quote.deliveryFee > 0 ? PriceConverter.convertPrice(quote.deliveryFee) : '-',
                             style: textRegular.copyWith(color: textColor, fontSize: Dimensions.fontSizeDefault)),
                   ]),
+                  // Close by: the shop may send its own staff instead of a rider, for its own (never higher) fee.
+                  if (controller.way == 'delivery' && !controller.quoting && quote?.ownDeliveryFee != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Icon(Icons.directions_walk_rounded, size: 16, color: Theme.of(context).hintColor),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(
+                          quote!.ownDeliveryFee! <= 0
+                              ? 'shop_may_bring_it_free'.tr
+                              : quote.ownDeliveryFee! < quote.deliveryFee
+                                  ? 'shop_may_bring_it_for'.trParams({'amount': PriceConverter.convertPrice(quote.ownDeliveryFee!)})
+                                  : 'shop_may_bring_it'.tr,
+                          style: textRegular.copyWith(color: Theme.of(context).hintColor, fontSize: Dimensions.fontSizeSmall),
+                        )),
+                      ]),
+                    ),
                   const Divider(),
                   PriceRow(label: 'total'.tr, amount: quote?.total ?? controller.cartSubtotal, bold: true),
                 ])),

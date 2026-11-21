@@ -119,7 +119,19 @@ class _StoreOrderScreenState extends State<StoreOrderScreen> {
   ({IconData icon, String title, String subtitle}) _hero(StoreOrderModel o) {
     final store = o.storeName ?? '';
     if (o.isConfirmedUnpaid) {
-      return (icon: Icons.verified_rounded, title: 'order_confirmed_title'.trParams({'store': store}), subtitle: 'order_confirmed_hint'.tr);
+      return (icon: Icons.verified_rounded, title: 'order_confirmed_title'.trParams({'store': store}),
+          subtitle: o.byStore ? 'order_confirmed_staff_hint'.tr : 'order_confirmed_hint'.tr);
+    }
+    // The shop's own staff bring it (a customer close by): no rider to find or follow.
+    if (o.byStore && o.status == StoreOrderModel.accepted) {
+      return (
+        icon: Icons.soup_kitchen_rounded,
+        title: 'order_preparing_title'.trParams({'store': store}),
+        subtitle: o.readyAt != null ? 'order_staff_ready_about'.trParams({'time': _clock(o.readyAt)}) : 'order_staff_will_bring'.tr,
+      );
+    }
+    if (o.byStore && o.status == StoreOrderModel.pickedUp) {
+      return (icon: Icons.directions_walk_rounded, title: 'order_on_the_way_title'.tr, subtitle: 'order_staff_on_the_way_hint'.trParams({'store': store}));
     }
     // Eat there or collect, paid: when it will be ready, then "it is ready".
     if (!o.isDelivery && o.status == StoreOrderModel.accepted) {
@@ -173,6 +185,19 @@ class _StoreOrderScreenState extends State<StoreOrderScreen> {
     ride.startLocationRecord();
     Get.find<MapController>().notifyMapController();
     MapScreen.open(MapScreen(fromScreen: MapScreenType.parcel, title: '${'order'.tr} #${o.ref ?? ''}'));
+  }
+
+  /// "The shop brings it": the customer has their order. Asked once more, since it closes the order.
+  Future<void> _received(StoreOrderModel o) async {
+    final sure = await Get.dialog<bool>(AlertDialog(
+      title: Text('order_received_question'.tr),
+      content: Text('order_received_hint'.trParams({'store': o.storeName ?? ''})),
+      actions: [
+        TextButton(onPressed: () => Get.back(result: false), child: Text('not_yet'.tr)),
+        TextButton(onPressed: () => Get.back(result: true), child: Text('order_received_yes'.tr, style: TextStyle(color: Theme.of(context).primaryColor))),
+      ],
+    ));
+    if (sure == true) await _controller.confirmReceived(o.id);
   }
 
   Future<void> _payAgain(StoreOrderModel o) async {
@@ -232,6 +257,10 @@ class _StoreOrderScreenState extends State<StoreOrderScreen> {
 
                     // Eat there or collect: the code to show, the way there, and "deliver it instead".
                     if (!o.isDelivery) _HereCard(order: o, clock: _stamp),
+
+                    // The shop's own staff bring it: who comes, the code for the door, "I have it".
+                    if (o.byStore && (o.isConfirmedUnpaid || o.status == StoreOrderModel.accepted || o.status == StoreOrderModel.pickedUp))
+                      _StaffCard(order: o, busy: controller.confirmingReceived, onReceived: () => _received(o)),
 
                     if (o.status == StoreOrderModel.changesProposed && o.proposal != null)
                       _ChangesCard(order: o, onAccept: () => _answer(o, true), onCancel: () => _answer(o, false)),
@@ -330,7 +359,7 @@ class _StoreOrderScreenState extends State<StoreOrderScreen> {
                         ),
                       const Divider(),
                       PriceRow(label: 'items_subtotal'.tr, amount: o.itemsSubtotal),
-                      if (o.isDelivery) PriceRow(label: 'delivery_fee'.tr, amount: o.deliveryFee),
+                      if (o.isDelivery) PriceRow(label: o.byStore ? 'delivery_by_shop_fee'.tr : 'delivery_fee'.tr, amount: o.deliveryFee),
                       PriceRow(label: 'total'.tr, amount: o.total, bold: true),
                       if (o.refundedAmount > 0)
                         Text('${'refunded_to_wallet'.tr}: ${PriceConverter.convertPrice(o.refundedAmount)}',
@@ -735,6 +764,58 @@ class _Steps extends StatelessWidget {
         ],
       ]),
     );
+  }
+}
+
+/// "The shop brings it": the customer is close by, so the shop's own staff
+/// come instead of a rider. Says so, shows the code to give at the door once
+/// paid, and lets the customer say they have their order once it is on the way.
+class _StaffCard extends StatelessWidget {
+  final StoreOrderModel order;
+  final bool busy;
+  final VoidCallback onReceived;
+  const _StaffCard({required this.order, required this.busy, required this.onReceived});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyMedium?.color;
+    return _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(Icons.directions_walk_rounded, color: theme.primaryColor),
+        const SizedBox(width: Dimensions.paddingSizeSmall),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('order_staff_title'.trParams({'store': order.storeName ?? ''}), style: textBold.copyWith(color: textColor, fontSize: Dimensions.fontSizeDefault)),
+          const SizedBox(height: 2),
+          Text('order_staff_hint'.tr, style: textRegular.copyWith(color: theme.hintColor, fontSize: Dimensions.fontSizeSmall)),
+        ])),
+      ]),
+      if (order.collectCode != null) ...[
+        const SizedBox(height: Dimensions.paddingSize),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          decoration: BoxDecoration(color: theme.primaryColor.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(8)),
+          child: Column(children: [
+            Text('order_your_code'.tr, style: textMedium.copyWith(fontSize: Dimensions.fontSizeSmall, color: theme.hintColor)),
+            const SizedBox(height: 4),
+            Text(order.collectCode!, style: textBold.copyWith(fontSize: 36, letterSpacing: 10, color: theme.primaryColor)),
+            Text('order_staff_code_hint'.tr, textAlign: TextAlign.center, style: textRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: theme.hintColor)),
+          ]),
+        ),
+      ],
+      if (order.canConfirmReceived) ...[
+        const SizedBox(height: Dimensions.paddingSize),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: theme.primaryColor, minimumSize: const Size.fromHeight(50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+          onPressed: busy ? null : onReceived,
+          icon: busy
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+              : const Icon(Icons.check_circle_outline_rounded, size: 20),
+          label: Text('order_received_button'.tr, style: textBold.copyWith(color: Colors.white)),
+        ),
+      ],
+    ]));
   }
 }
 

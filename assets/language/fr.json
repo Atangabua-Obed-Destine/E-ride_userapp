@@ -4394,5 +4394,21 @@
     "guide_safety_body": "Un proche peut suivre votre course en direct.",
     "guide_id": "Faites vérifier votre identité E-Ride",
     "guide_id_body": "Un badge auquel chauffeurs, vendeurs et hôtels font confiance.",
-    "guide_pay_line": "Vous payez avec MTN MoMo ou Orange Money, dans l'application."
+    "guide_pay_line": "Vous payez avec MTN MoMo ou Orange Money, dans l'application.",
+    "order_confirmed_staff_hint": "Vous êtes tout près : leur propre personnel vous l'apporte. Payez maintenant et ils commencent.",
+    "order_staff_ready_about": "Prête vers @time. Leur propre personnel vous l'apporte.",
+    "order_staff_will_bring": "Leur propre personnel vous l'apporte.",
+    "order_staff_on_the_way_hint": "Le personnel de @store vous l'apporte.",
+    "order_staff_title": "Apportée par le personnel de @store",
+    "order_staff_hint": "Vous êtes tout près : la boutique vient elle-même, sans livreur E-Ride. Il n'y a pas de carte à suivre : appelez la boutique au besoin.",
+    "order_staff_code_hint": "Donnez-le à la personne qui apporte votre commande, une fois que vous l'avez en main.",
+    "order_received_button": "J'ai reçu ma commande",
+    "order_received_question": "Avez-vous votre commande ?",
+    "order_received_hint": "Confirmez seulement quand la commande de @store est entre vos mains. Cela clôt la commande.",
+    "order_received_yes": "Oui, je l'ai",
+    "not_yet": "Pas encore",
+    "delivery_by_shop_fee": "Livraison par la boutique",
+    "shop_may_bring_it": "Vous êtes tout près : la boutique peut l'apporter elle-même, sans livreur.",
+    "shop_may_bring_it_for": "Vous êtes tout près : la boutique peut l'apporter elle-même. La livraison coûterait alors @amount.",
+    "shop_may_bring_it_free": "Vous êtes tout près : la boutique peut l'apporter elle-même. La livraison serait alors gratuite."
 }

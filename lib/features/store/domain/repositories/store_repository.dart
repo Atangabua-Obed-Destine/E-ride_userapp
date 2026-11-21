@@ -86,6 +86,11 @@ class StoreRepository implements StoreRepositoryInterface {
   }
 
   @override
+  Future confirmReceived(String orderId) async {
+    return await apiClient.postData('${AppConstants.storeOrders}/$orderId/received', {});
+  }
+
+  @override
   Future answerChanges(String orderId, bool accept) async {
     return await apiClient.postData('${AppConstants.storeOrders}/$orderId/changes', {'accept': accept});
   }

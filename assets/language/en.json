@@ -4393,5 +4393,21 @@
     "guide_safety_body": "Someone close can follow your ride live.",
     "guide_id": "Get E-Ride ID verified",
     "guide_id_body": "A badge drivers, sellers and hotels can trust.",
-    "guide_pay_line": "You pay with MTN MoMo or Orange Money, right in the app."
+    "guide_pay_line": "You pay with MTN MoMo or Orange Money, right in the app.",
+    "order_confirmed_staff_hint": "You are close by, so their own staff will bring it. Pay now and they start.",
+    "order_staff_ready_about": "Ready around @time. Their own staff will bring it to you.",
+    "order_staff_will_bring": "Their own staff will bring it to you.",
+    "order_staff_on_the_way_hint": "The staff of @store are bringing it to you.",
+    "order_staff_title": "Brought by the staff of @store",
+    "order_staff_hint": "You are close by, so the shop comes itself instead of an E-Ride rider. There is no map to follow: call the shop if you need to.",
+    "order_staff_code_hint": "Give it to the person who brings your order, once you have it in your hands.",
+    "order_received_button": "I have received my order",
+    "order_received_question": "Do you have your order?",
+    "order_received_hint": "Confirm only when the order from @store is in your hands. This closes the order.",
+    "order_received_yes": "Yes, I have it",
+    "not_yet": "Not yet",
+    "delivery_by_shop_fee": "Delivery by the shop",
+    "shop_may_bring_it": "You are close by: the shop may bring it itself instead of a rider.",
+    "shop_may_bring_it_for": "You are close by: the shop may bring it itself. Delivery would then cost @amount.",
+    "shop_may_bring_it_free": "You are close by: the shop may bring it itself. Delivery would then be free."
 }

@@ -66,7 +66,13 @@ class StoreOrderModel {
   DateTime? deliveryChangePayBy;
   /// The delivery fee's page, to open again after leaving it unpaid.
   String? deliveryChangePayUrl;
+  /// Who brings a delivery: 'rider' (E-Ride) or 'store' (its own staff, for a customer close by).
+  String? deliveredBy;
+  /// The shop's staff are on the way: the customer can say they have their order.
+  bool canConfirmReceived = false;
   bool get isDelivery => fulfilment == 'delivery';
+  /// "The shop brings it": no rider to find or follow, a code to give at the door.
+  bool get byStore => isDelivery && deliveredBy == 'store';
   bool get isDineIn => fulfilment == 'dine_in';
   bool get isPickup => fulfilment == 'pickup';
   String? cancelReason;
@@ -191,6 +197,8 @@ class StoreOrderModel {
       ..arriveAt = _date(json['arrive_at'])
       ..guests = int.tryParse('${json['guests']}')
       ..collectCode = json['collect_code']?.toString()
+      ..deliveredBy = json['delivered_by']?.toString()
+      ..canConfirmReceived = json['can_confirm_received'] == true
       ..readyTold = json['ready_told'] == true
       ..storeAddress = place['address']?.toString()
       ..storeLatitude = double.tryParse('${place['latitude']}')
@@ -292,6 +300,8 @@ class StoreQuote {
   double total;
   double? distanceKm;
   int? durationMin;
+  /// Close by: the shop may bring it itself, for this fee instead of the rider's. Null when not.
+  double? ownDeliveryFee;
 
   StoreQuote({required this.ok, required this.problems, this.itemsSubtotal = 0, this.deliveryFee = 0, this.total = 0, this.distanceKm, this.durationMin});
 
@@ -303,5 +313,5 @@ class StoreQuote {
         total: double.tryParse('${json['total']}') ?? 0,
         distanceKm: double.tryParse('${json['distance_km']}'),
         durationMin: int.tryParse('${json['duration_min']}'),
-      );
+      )..ownDeliveryFee = json['own_delivery'] is Map ? double.tryParse('${json['own_delivery']['fee']}') : null;
 }

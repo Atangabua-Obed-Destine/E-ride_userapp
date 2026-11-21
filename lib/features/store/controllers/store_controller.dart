@@ -138,6 +138,22 @@ class StoreController extends GetxController implements GetxService {
     }
   }
 
+  /// "The shop brings it": the customer has their order, which closes it.
+  bool confirmingReceived = false;
+  Future<void> confirmReceived(String orderId) async {
+    if (confirmingReceived) return;
+    confirmingReceived = true;
+    update();
+    final Response response = await storeServiceInterface.confirmReceived(orderId);
+    confirmingReceived = false;
+    if (response.statusCode == 200 && response.body['data'] is Map) {
+      order = StoreOrderModel.fromJson(Map<String, dynamic>.from(response.body['data']));
+    } else {
+      showCustomSnackBar(_firstError(response));
+    }
+    update();
+  }
+
   // ---------------------------------------------------------------- orders
   List<StoreOrderModel>? orders;
   bool ordersLoading = false;

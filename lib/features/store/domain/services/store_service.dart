@@ -49,6 +49,9 @@ class StoreService implements StoreServiceInterface {
   Future keepWay(String orderId) => storeRepositoryInterface.keepWay(orderId);
 
   @override
+  Future confirmReceived(String orderId) => storeRepositoryInterface.confirmReceived(orderId);
+
+  @override
   Future claimLinkReferral(String slug) => storeRepositoryInterface.claimLinkReferral(slug);
 
   @override

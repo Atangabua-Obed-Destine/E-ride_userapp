@@ -15,6 +15,7 @@ abstract class StoreRepositoryInterface implements RepositoryInterface {
   Future<dynamic> answerChanges(String orderId, bool accept);
   Future<dynamic> deliverInstead(String orderId, Map<String, dynamic> body);
   Future<dynamic> keepWay(String orderId);
+  Future<dynamic> confirmReceived(String orderId);
   Future<dynamic> claimLinkReferral(String slug);
   Future<dynamic> reviewOrder(String orderId, Map<String, dynamic> body);
 }
