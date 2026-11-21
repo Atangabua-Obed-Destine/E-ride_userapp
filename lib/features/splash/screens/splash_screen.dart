@@ -103,7 +103,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   void _checkConnectivity() {
     bool isFirst = true;
     _onConnectivityChanged = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
-      bool isConnected = result.contains(ConnectivityResult.wifi) || result.contains(ConnectivityResult.mobile);
+      // Any network counts, not only Wi-Fi and mobile data: a phone on a VPN, a wired
+      // connection or the iOS simulator reports another kind and is just as online.
+      bool isConnected = result.any((ConnectivityResult r) => r != ConnectivityResult.none);
       if (!isFirst || !isConnected) {
         ScaffoldMessenger.of(Get.context!).removeCurrentSnackBar();
         ScaffoldMessenger.of(Get.context!).hideCurrentSnackBar();
