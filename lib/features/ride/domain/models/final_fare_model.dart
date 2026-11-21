@@ -1,3 +1,5 @@
+import 'package:ride_sharing_user_app/features/deposit/domain/models/trip_deposit_model.dart';
+
 
 class FinalFareModel {
   String? responseCode;
@@ -64,6 +66,20 @@ class FinalFare {
   double? idleTime;
   double? actualTime;
   double? estimatedTime;
+  /// Booking deposit, when the trip asked for one.
+  TripDeposit? deposit;
+  /// E-Ride Move: nothing is paid in the app.
+  bool isMove = false;
+  bool isDropFare = false;
+
+  /// The part of a paid deposit that counts toward [total] (fare plus tips).
+  double depositCredit(double total) {
+    final d = deposit;
+    if (d == null) return 0;
+    if (d.isPaid) return d.amount < total ? d.amount : (total < 0 ? 0 : total);
+    if (d.status == TripDeposit.applied) return d.appliedAmount;
+    return 0;
+  }
 
   FinalFare(
       {this.id,
@@ -165,6 +181,9 @@ class FinalFare {
     idleTime = double.tryParse(json['idle_time'].toString());
     actualTime = double.tryParse(json['actual_time'].toString());
     estimatedTime = double.tryParse(json['estimated_time'].toString());
+    deposit = TripDeposit.fromJson(json['deposit']);
+    isMove = json['is_move'] == true;
+    isDropFare = json['is_drop_fare'] == true;
   }
 
 }

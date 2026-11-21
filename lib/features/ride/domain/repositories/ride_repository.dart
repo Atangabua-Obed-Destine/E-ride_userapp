@@ -27,6 +27,7 @@ class RideRepository implements RideRepositoryInterface{
     String? parcelCategoryId,
     String? rideRequestType,
     required String? scheduledAt,
+    Map<String, dynamic>? extra,
   }) async {
     return await apiClient.postData(AppConstants.estimatedFare, {
       "pickup_coordinates" : '[${pickupLatLng.latitude},${pickupLatLng.longitude}]',
@@ -40,6 +41,7 @@ class RideRepository implements RideRepositoryInterface{
       'parcel_weight' : type == 'parcel' ?  Get.find<ParcelController>().parcelWeightController.text : parcelWeight,
       "parcel_category_id" :type == 'parcel' ? Get.find<ParcelController>().parcelCategoryList![Get.find<ParcelController>().selectedParcelCategory].id : parcelCategoryId,
       "scheduled_at" : scheduledAt,
+      ...?extra,
     });
   }
 
@@ -97,7 +99,8 @@ class RideRepository implements RideRepositoryInterface{
         required String? scheduledAt,
         String? rideRequestType,
         double? surgeMultiplier,
-        bool? isFemaleDriverRequired
+        bool? isFemaleDriverRequired,
+        Map<String, dynamic>? extra,
       }) async {
     return await apiClient.postData(AppConstants.rideRequest, {
       "pickup_coordinates" : '[$pickupLat,$pickupLng]',
@@ -145,6 +148,7 @@ class RideRepository implements RideRepositoryInterface{
       "ride_request_type" : rideRequestType,
       "surge_multiplier" : surgeMultiplier,
       "is_female_driver_requested" : isFemaleDriverRequired,
+      ...?extra,
 
     });
   }
@@ -155,13 +159,22 @@ class RideRepository implements RideRepositoryInterface{
   }
 
   @override
-  Future<Response> tripStatusUpdate(String id, String status,String cancellationCause) async {
-    return await apiClient.postData('${AppConstants.updateTripStatus}$id',
-        {
-          "status": status,
-          "cancel_reason": cancellationCause,
-          "_method" : 'put'
-        });
+  Future<Response> tripStatusUpdate(String id, String status,String cancellationCause, {List<String>? identityMismatchReason}) async {
+
+    Map<String, String> bodyData = {};
+    bodyData['status'] = status;
+    bodyData['_method'] = 'put';
+
+    if(cancellationCause.isNotEmpty){
+      bodyData['cancel_reason'] = cancellationCause;
+    }
+    if((identityMismatchReason ?? []).isNotEmpty){
+      for(int i = 0 ; i< identityMismatchReason!.length ; i++){
+        bodyData['identity_mismatch_reason[$i]'] = identityMismatchReason[i];
+      }
+    }
+
+    return await apiClient.postData('${AppConstants.updateTripStatus}$id', bodyData);
   }
 
   @override

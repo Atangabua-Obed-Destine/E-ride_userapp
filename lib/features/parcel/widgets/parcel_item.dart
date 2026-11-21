@@ -33,7 +33,7 @@ class ParcelItem extends StatelessWidget {
                   Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.otpSent);
                   Get.find<RideController>().startLocationRecord();
                   Get.find<MapController>().notifyMapController();
-                  Get.to(() => const MapScreen(fromScreen: MapScreenType.parcel));
+                  MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
                 }
               });
             }else if(rideRequest.currentStatus == "returning" && rideRequest.type == AppConstants.parcel){
@@ -49,7 +49,7 @@ class ParcelItem extends StatelessWidget {
                         Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.parcelOngoing);
                         Get.find<RideController>().startLocationRecord();
                         parcelController.setParcelLoadingDeactive(index);
-                        Get.to(()=> const MapScreen(fromScreen: MapScreenType.parcel));
+                        MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
                       }
                     });
                   }
@@ -76,7 +76,7 @@ class ParcelItem extends StatelessWidget {
                         Get.find<MapController>().getPolyline();
                         Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.parcelOngoing);
                         parcelController.setParcelLoadingDeactive(index);
-                        Get.to(() => const MapScreen(fromScreen: MapScreenType.parcel));
+                        MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
                       }
                     });
                   }else{
@@ -85,7 +85,7 @@ class ParcelItem extends StatelessWidget {
                     Get.find<RideController>().startLocationRecord();
                     Get.find<MapController>().notifyMapController();
                     parcelController.setParcelLoadingDeactive(index);
-                    Get.to(() => const MapScreen(fromScreen: MapScreenType.parcel));
+                    MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
                   }
                 }
               }

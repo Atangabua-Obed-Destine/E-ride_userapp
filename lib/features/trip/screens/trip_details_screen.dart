@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:ride_sharing_user_app/features/lost_item/widgets/lost_item_widgets.dart';
+import 'package:ride_sharing_user_app/features/ride/domain/models/trip_details_model.dart';
+import 'package:ride_sharing_user_app/features/deposit/widgets/deposit_widgets.dart';
 import 'package:get/get.dart';
 import 'package:just_the_tooltip/just_the_tooltip.dart';
 import 'package:ride_sharing_user_app/common_widgets/app_bar_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/body_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
+import 'package:ride_sharing_user_app/common_widgets/confirmation_dialog_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/custom_pop_scope_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/loader_widget.dart';
 import 'package:ride_sharing_user_app/features/dashboard/screens/dashboard_screen.dart';
@@ -35,20 +39,40 @@ class TripDetailsScreen extends StatefulWidget {
   State<TripDetailsScreen> createState() => _TripDetailsScreenState();
 }
 
-class _TripDetailsScreenState extends State<TripDetailsScreen> {
+class _TripDetailsScreenState extends State<TripDetailsScreen> with WidgetsBindingObserver {
 
   JustTheController toolTipController = JustTheController();
+  /// The trip in progress, when this screen shows another one in its place.
+  TripDetails? _liveTrip;
 
   @override
   void initState() {
+    final TripDetails? current = Get.find<RideController>().tripDetails;
+    if (current != null && current.id != widget.tripId && _liveStatuses.contains(current.currentStatus)) {
+      _liveTrip = current;
+    }
     if(!widget.fromNotification){
       Get.find<RideController>().getRideDetails(widget.tripId, isUpdate: false);
     }
+    WidgetsBinding.instance.addObserver(this);
     super.initState();
+  }
+
+  /// Back from the background (a push, another app): the trip may have moved on meanwhile,
+  /// e.g. a driver accepted a scheduled ride and its deposit countdown started.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      final TripDetails? shown = Get.find<RideController>().tripDetails;
+      if (shown?.id == widget.tripId && _liveStatuses.contains(shown?.currentStatus)) {
+        Get.find<RideController>().getRideDetails(widget.tripId);
+      }
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     toolTipController.dispose();
     super.dispose();
   }
@@ -66,7 +90,11 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
             }
             return PopScope(
               onPopInvokedWithResult: (didPop, val){
-                rideController.clearRideDetails();
+                if (_liveTrip != null) {
+                  rideController.restoreTripDetails(_liveTrip!);
+                } else {
+                  rideController.clearRideDetails();
+                }
               },
               child: BodyWidget(
                 appBar: AppBarWidget(
@@ -87,6 +115,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
                             TripDetailsTopSectionWidget(tripDetails: rideController.tripDetails),
                             const SizedBox(height: Dimensions.paddingSizeSmall),
+
+                            // A scheduled ride asks for its deposit here: when booking (no driver yet),
+                            // or once a driver has accepted ahead of time.
+                            if (rideController.tripDetails != null && (['accepted', 'out_for_pickup'].contains(rideController.tripDetails!.currentStatus)
+                                || (rideController.tripDetails!.currentStatus == 'pending' && rideController.tripDetails!.type == 'scheduled_request')))
+                              DepositCard(trip: rideController.tripDetails!),
 
                             rideController.tripDetails?.type == 'parcel' ?
                             ParcelDetailsWidget(tripDetails: rideController.tripDetails!) :
@@ -130,6 +164,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                               const SizedBox(height: Dimensions.paddingSizeSmall)
                             ],
 
+                            // Lost and found: "I left something in the car", or the case once reported.
+                            LostItemSection(key: ValueKey('lost-${rideController.tripDetails!.id}'), trip: rideController.tripDetails!),
+
                             if(rideController.tripDetails?.type == 'scheduled_request')...[
                               _ShowScheduleTripEditCancelButton(tripId: widget.tripId),
                               const SizedBox(height: Dimensions.paddingSizeDefault),
@@ -156,7 +193,24 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                           buttonText: 'give_review'.tr,
                           onPressed: () => Get.to(() => ReviewScreen(tripId: widget.tripId)),
                         ),
-                      ) : const SizedBox()
+                      ) : const SizedBox(),
+
+                      // Report the driver (a driver who cancelled after the deposit, rudeness...).
+                      if (_canReportDriver(rideController))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault, vertical: Dimensions.paddingSizeExtraSmall),
+                          child: rideController.tripDetails!.driverReported
+                              ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                  Icon(Icons.flag_rounded, size: 16, color: Theme.of(context).hintColor),
+                                  const SizedBox(width: 6),
+                                  Text('driver_reported'.tr, style: textRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor)),
+                                ])
+                              : Center(child: TextButton.icon(
+                                  onPressed: () => showReportDriverSheet(widget.tripId),
+                                  icon: Icon(Icons.flag_outlined, size: 18, color: Theme.of(context).colorScheme.error),
+                                  label: Text('report_driver'.tr, style: textMedium.copyWith(color: Theme.of(context).colorScheme.error)),
+                                )),
+                        ),
                     ]),
 
                     if(rideController.tripDetails?.customerSafetyAlert != null)
@@ -241,7 +295,10 @@ class _ShowScheduleTripEditCancelButton extends StatelessWidget {
             onPressed: () => Get.bottomSheet(ScheduleDateTimePickerWidget(fromSetDestinationScreen: true, tripId: tripId),enableDrag: false, isScrollControlled: true),
           ),
 
-        if(rideController.tripDetails?.currentStatus != 'cancelled')
+        if(rideController.tripDetails?.currentStatus != 'cancelled') ...[
+          const SizedBox(height: Dimensions.paddingSizeSmall),
+          // What cancelling now does to the deposit.
+          DepositCancelNote(deposit: rideController.tripDetails?.deposit),
           GetBuilder<RideController>(builder: (rideController){
             return rideController.isLoading ?
             CircularProgressIndicator(color: Theme.of(context).primaryColor) :
@@ -250,17 +307,35 @@ class _ShowScheduleTripEditCancelButton extends StatelessWidget {
               textColor: Theme.of(context).colorScheme.error,
               buttonText: 'cancel_trip'.tr,
               onPressed: () {
-                Get.find<RideController>().tripStatusUpdate(tripId, 'cancelled', 'ride_request_cancelled_successfully','').then((value){
-                  if(value.statusCode == 200){
-                    Get.offAll(const DashboardScreen());
-                  }
-                });
+                final message = depositCancelMessage(rideController.tripDetails?.deposit);
+                Get.dialog(ConfirmationDialogWidget(
+                  icon: Images.cancelIcon,
+                  description: ['are_you_sure'.tr, if (message != null) message.$1].join('\n'),
+                  onYesPressed: () {
+                    Get.back();
+                    Get.find<RideController>().tripStatusUpdate(tripId, 'cancelled', 'ride_request_cancelled_successfully','').then((value){
+                      if(value.statusCode == 200){
+                        Get.offAll(const DashboardScreen());
+                      }
+                    });
+                  },
+                ), barrierDismissible: false);
               },
             );
-          })
+          }),
+        ],
       ]);
     });
   }
 }
 
+const List<String> _liveStatuses = ['pending', 'accepted', 'out_for_pickup', 'ongoing', 'returning'];
 
+/// A recent trip that had a driver, once it is over.
+bool _canReportDriver(RideController rideController) {
+  final trip = rideController.tripDetails;
+  if (trip == null || (trip.driver == null && trip.deposit == null)) return false;
+  if (!['completed', 'cancelled', 'returned'].contains(trip.currentStatus)) return false;
+  final created = DateTime.tryParse(trip.createdAt ?? '');
+  return created == null || DateTime.now().difference(created).inDays < 7;
+}

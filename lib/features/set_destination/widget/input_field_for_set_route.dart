@@ -12,9 +12,11 @@ class InputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(height: 45,
-      decoration: BoxDecoration(color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall)),
+    return Container(height: Get.height * 0.057,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall),
+      ),
       child: TextFormField(
         controller: controller,
         style: textRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium?.color),
@@ -23,17 +25,15 @@ class InputField extends StatelessWidget {
         keyboardType: TextInputType.text,
         decoration: InputDecoration(
           fillColor: Get.isDarkMode? Theme.of(context).cardColor : null,
-            filled: Get.isDarkMode,
+          filled: Get.isDarkMode,
           contentPadding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeSmall),
           hintText: hint ?? 'Enter Route',
           suffixIcon: showSuffix? Icon(Icons.place_outlined, color: Colors.white.withValues(alpha:0.7)): const SizedBox(),
           hintStyle: textRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.5), fontSize : Dimensions.fontSizeSmall),
-          enabledBorder: UnderlineInputBorder(
-            borderSide:  BorderSide(width: 0.5, color: Theme.of(context).hintColor.withValues(alpha:0.5))),
-          focusedBorder:const OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.transparent, width: 0)),
+          enabledBorder: UnderlineInputBorder(borderSide:  BorderSide(width: 0, color: Colors.transparent)),
+          focusedBorder:const OutlineInputBorder(borderSide: BorderSide(color: Colors.transparent, width: 0)),
         ),
         cursorColor: Theme.of(context).primaryColor,
-      ),);
+      ));
   }
 }

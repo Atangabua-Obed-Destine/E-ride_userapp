@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 val keystoreProperties = Properties()
@@ -33,6 +34,8 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // E-Ride Market link domain (set marketLinkHost in gradle.properties once the domain exists).
+        manifestPlaceholders["marketLinkHost"] = (project.findProperty("marketLinkHost") as String?) ?: "market.e-ride.invalid"
     }
 
     signingConfigs {
@@ -47,6 +50,7 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("debug") // or "release" if you have real keystore
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
@@ -59,6 +63,8 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("com.google.firebase:firebase-messaging:23.4.1")
+    implementation("androidx.fragment:fragment:1.5.6")
+    implementation("com.facebook.android:facebook-android-sdk:latest.release")
 }
 
 kotlin {

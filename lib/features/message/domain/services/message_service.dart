@@ -34,4 +34,12 @@ class MessageService implements MessageServiceInterface{
     return messageRepositoryInterface.findChannelRideStatus(channelId);
   }
 
+  @override
+  Future<Response> markChatRead(String channelId) => messageRepositoryInterface.markChatRead(channelId);
+
+  @override
+  Future<Response> sendTyping(String channelId, {bool typing = true}) => messageRepositoryInterface.sendTyping(channelId, typing: typing);
+
+  @override
+  Future<Response> getUnreadSummary() => messageRepositoryInterface.getUnreadSummary();
 }

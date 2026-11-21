@@ -1,3 +1,4 @@
+import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/common_widgets/expandable_bottom_sheet.dart';
@@ -17,6 +18,8 @@ class WhoWillPayButton extends StatefulWidget {
 class _WhoWillPayButtonState extends State<WhoWillPayButton> {
   @override
   Widget build(BuildContext context) {
+    // The receiver can only pay on delivery, in cash: with cash turned off there is no choice to make.
+    if (!(Get.find<ConfigController>().config?.paymentCashStatus ?? true)) return const SizedBox.shrink();
     return GetBuilder<ParcelController>(builder: (parcelController){
       return Container(
         decoration: BoxDecoration(

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Teal (primary) tiled dash for the COMPLETED portion of the track.
+     Same tile dimensions/phase as the gray tile so the teal dashes overlay
+     exactly on top of the gray ones. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/dash_tile_teal"
+    android:tileModeX="repeat"
+    android:tileModeY="disabled"
+    android:gravity="center_vertical|fill_horizontal" />

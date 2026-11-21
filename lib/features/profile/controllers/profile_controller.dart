@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ride_sharing_user_app/util/app_constants.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ride_sharing_user_app/data/api_checker.dart';
 import 'package:ride_sharing_user_app/data/api_client.dart';
@@ -16,6 +19,23 @@ import 'package:ride_sharing_user_app/helper/file_validation_helper.dart';
 class ProfileController extends GetxController implements GetxService {
   final ProfileServiceInterface profileServiceInterface;
   ProfileController({required this.profileServiceInterface});
+
+  @override
+  void onInit() {
+    super.onInit();
+    // The profile saved last time (removed on sign-in and sign-out), so Home
+    // greets the customer by name before the fresh one loads.
+    final String? saved = Get.find<SharedPreferences>().getString(AppConstants.savedProfile);
+    if (saved != null) {
+      try {
+        profileModel = ProfileModel.fromJson(jsonDecode(saved));
+      } catch (_) {}
+    }
+  }
+
+  /// True once the profile has loaded from the server since the app started.
+  bool loadedThisSession = false;
+  Future<Response>? _profileLoad;
 
   final List<String> _identityTypeList = ['passport', 'driving_license', 'nid'];
   XFile? _pickedProfileFile;
@@ -105,10 +125,17 @@ class ProfileController extends GetxController implements GetxService {
     }
   }
 
-  Future<Response> getProfileInfo() async {
+  /// Callers at the same moment (start-up, Home) share one request.
+  Future<Response> getProfileInfo() {
+    return _profileLoad ??= _loadProfile().whenComplete(() => _profileLoad = null);
+  }
+
+  Future<Response> _loadProfile() async {
     Response? response = await profileServiceInterface.getProfileInfo();
     if(response!.statusCode == 200) {
       profileModel = ProfileModel.fromJson(response.body);
+      loadedThisSession = true;
+      Get.find<SharedPreferences>().setString(AppConstants.savedProfile, jsonEncode(response.body));
     }else{
       ApiChecker.checkApi(response);
     }

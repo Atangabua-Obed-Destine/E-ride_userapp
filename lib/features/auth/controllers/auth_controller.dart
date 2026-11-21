@@ -1,13 +1,16 @@
-import 'package:country_code_picker/country_code_picker.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/data/api_checker.dart';
 import 'package:ride_sharing_user_app/data/api_client.dart';
+import 'package:ride_sharing_user_app/features/auth/controllers/facebook_login_controller.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/enums/verification_from_enum.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/models/additional_field_model.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/models/sign_up_body.dart';
+import 'package:ride_sharing_user_app/features/auth/domain/models/social_log_in_body.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/services/auth_service_interface.dart';
 import 'package:ride_sharing_user_app/features/auth/screens/otp_signup_screen.dart';
 import 'package:ride_sharing_user_app/features/auth/widgets/manual_auth_waring_bottom_sheet_widget.dart';
@@ -24,6 +27,7 @@ import 'package:ride_sharing_user_app/helper/display_helper.dart';
 import 'package:ride_sharing_user_app/features/profile/controllers/profile_controller.dart';
 import 'package:ride_sharing_user_app/helper/login_helper.dart';
 import 'package:ride_sharing_user_app/helper/pusher_helper.dart';
+import 'package:ride_sharing_user_app/util/app_constants.dart';
 
 class AuthController extends GetxController implements GetxService {
   final AuthServiceInterface authServiceInterface;
@@ -66,6 +70,12 @@ class AuthController extends GetxController implements GetxService {
 
   final Map<String, dynamic> additionalData = {};
   List<MultipartBody> additionalFiles = [];
+
+  final GoogleSignIn signIn = GoogleSignIn.instance;
+  GoogleSignInAccount? googleAccount;
+
+
+
 
 
   void toggleNavigationBar(){
@@ -272,7 +282,7 @@ class AuthController extends GetxController implements GetxService {
       }
 
     }else if(response.statusCode == 406){
-      Get.off(()=> OtpSignupScreen(phoneNumber: phone));
+      Get.off(()=> OtpSignupScreen(phoneNumber: phone, fromOtpRegistration: true));
     }else{
       otpVerifying = false;
       ApiChecker.checkApi(response);
@@ -481,7 +491,7 @@ class AuthController extends GetxController implements GetxService {
         _additionalFieldControllers[field.id] = TextEditingController();
         _additionalFieldFocusNodes[field.id] = FocusNode();
         if (field.fieldType == AdditionalFieldType.phone) {
-          _additionalFieldPhoneCountryCodes[field.id] = CountryCode.fromCountryCode(Get.find<ConfigController>().config!.countryCode!).dialCode ?? '+237';
+          _additionalFieldPhoneCountryCodes[field.id] = Get.find<ConfigController>().countryDialCode;
         }
       }
     }
@@ -577,6 +587,138 @@ class AuthController extends GetxController implements GetxService {
     passwordController.clear();
     confirmPasswordController.clear();
     referralCodeController.clear();
+  }
+
+
+  Future<SocialLogInBody?> googleLogin() async {
+    SocialLogInBody? socialLoginModel;
+
+    try {
+      if(signIn.supportsAuthenticate()) {
+        await signIn.initialize(serverClientId: AppConstants.googleServerClientId).then((_) async {
+
+          googleAccount = await signIn.authenticate();
+          const List<String> scopes = <String>['email'];
+          final auth = await googleAccount?.authorizationClient.authorizationForScopes(scopes);
+
+          socialLoginModel = SocialLogInBody(
+            uniqueId: auth?.accessToken,
+            token: auth?.accessToken,
+            medium: SocialLoginType.google.name,
+            email: googleAccount?.email,
+            userName: googleAccount?.displayName,
+          );
+        });
+      }else {
+        debugPrint("Google Sign-In not supported on this device.");
+      }
+    } catch (e) {
+      debugPrint("google_login: $e");
+    }
+    return socialLoginModel;
+  }
+
+  Future<SocialLogInBody?> facebookLogin() async {
+    final FacebookLoginController facebookLoginController = Get.find<FacebookLoginController>();
+
+    await facebookLoginController.login();
+
+    if (facebookLoginController.result.status == LoginStatus.success) {
+      final Map userData = await facebookLoginController.facebookAuth.getUserData(fields: 'name, email');
+
+      return SocialLogInBody(
+        email: userData['email'],
+        token: facebookLoginController.result.accessToken?.tokenString,
+        uniqueId: userData['id'],
+        medium: SocialLoginType.facebook.name,
+        userName: userData['name'],
+      );
+    }
+
+    return null;
+  }
+
+
+  Future<void> loginWithSocialMedia(SocialLogInBody socialLogInBody) async {
+    _isLoading = true;
+    update();
+    Response response = await authServiceInterface.loginWithSocialMedia(socialLogInBody);
+    _isLoading = false;
+
+    if (response.statusCode == 200) {
+      setUserToken(response.body['data']['token']);
+      PusherHelper.initializePusher();
+      updateToken();
+
+      await Get.find<ProfileController>().getProfileInfo();
+      Get.find<BottomMenuController>().resetNavBar();
+      Get.find<BottomMenuController>().navigateToDashboard();
+
+    } else if(response.statusCode == 202){
+      final bool isPhoneNotVerified = response.body['data']['is_phone_verified'] == 0;
+
+      if (isPhoneNotVerified) {
+        if (Get.find<ConfigController>().config?.isFirebaseOtpVerification ?? false) {
+          firebaseOtpSend(response.body['data']['phone'] ?? '', from: VerificationForm.login);
+        } else if(Get.find<ConfigController>().config?.isSmsGateway ?? false){
+          sendOtp(response.body['data']['phone'] ?? '').then((_){
+            Get.to(() => VerificationScreen(number: response.body['data']['phone'] ?? '', form: VerificationForm.login));
+          });
+
+        }else{
+          showCustomSnackBar('sms_gateway_not_integrate'.tr);
+        }
+      }
+    }else if (response.statusCode == 406) {
+      if(socialLogInBody.email == null || socialLogInBody.email!.isEmpty){
+        socialLogInBody.email = response.body['data']['email'];
+      }
+      Get.to(()=> OtpSignupScreen(phoneNumber: null, fromOtpRegistration: false, socialLogInBody: socialLogInBody));
+
+    } else {
+      ApiChecker.checkApi(response);
+    }
+  }
+
+  Future<void> registrationFromSocialLogin(SignUpBody signUpBody) async {
+    _isLoading = true;
+    update();
+    await getAdditionalFieldValues();
+
+    Response? response = await authServiceInterface.registrationFromSocialLogin(signUpBody, additionalData: additionalData, additionalFiles: additionalFiles);
+
+    _isLoading = false;
+
+    if (response?.statusCode == 200) {
+      disposeAdditionalFields();
+      setUserToken(response!.body['data']['token']);
+      PusherHelper.initializePusher();
+      updateToken();
+
+      await Get.find<ProfileController>().getProfileInfo();
+      Get.find<BottomMenuController>().resetNavBar();
+      Get.find<BottomMenuController>().navigateToDashboard();
+
+    }else if(response?.statusCode == 202){
+      final bool isPhoneNotVerified = response?.body['data']['is_phone_verified'] == 0;
+
+      if (isPhoneNotVerified) {
+        if (Get.find<ConfigController>().config?.isFirebaseOtpVerification ?? false) {
+          firebaseOtpSend(signUpBody.phone ?? '', from: VerificationForm.login);
+        } else if(Get.find<ConfigController>().config?.isSmsGateway ?? false){
+          sendOtp(signUpBody.phone ?? '').then((_){
+            Get.to(() => VerificationScreen(number: signUpBody.phone ?? '', form: VerificationForm.login));
+          });
+
+        }else{
+          showCustomSnackBar('sms_gateway_not_integrate'.tr);
+        }
+      }
+    }else {
+      ApiChecker.checkApi(response!);
+    }
+
+    update();
   }
 
 }

@@ -115,7 +115,11 @@ class TripDetailsTopSectionWidget extends StatelessWidget {
             ),
           ),
 
-          if(tripDetails?.type == 'scheduled_request' && tripDetails?.currentStatus == 'pending')
+          // Booked ahead, its deposit not paid yet: the ride is booked once it is.
+          if(tripDetails?.type == 'scheduled_request' && tripDetails?.currentStatus == 'pending' && (tripDetails?.deposit?.isAwaiting ?? false))
+            Text('scheduled_awaiting_deposit'.tr, textAlign: TextAlign.center,
+                style: textRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.7)))
+          else if(tripDetails?.type == 'scheduled_request' && tripDetails?.currentStatus == 'pending')
             RichText(text: TextSpan(
               text: 'your_scheduled_trip_has_been'.tr,
               children: [
@@ -139,6 +143,26 @@ class TripDetailsTopSectionWidget extends StatelessWidget {
       ),
       const SizedBox(height: Dimensions.paddingSizeDefault),
 
+      if (tripDetails?.isHealthRide ?? false)
+        Padding(
+          padding: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.local_hospital_rounded, size: 16, color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 4),
+            Text('health_ride'.tr, style: textSemiBold.copyWith(color: Theme.of(context).colorScheme.error, fontSize: Dimensions.fontSizeSmall)),
+          ]),
+        ),
+
+      if (tripDetails?.isMove ?? false) ...[
+        Text('move_price_label'.tr, style: textSemiBold.copyWith(
+            color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+            fontSize: Dimensions.fontSizeSmall
+        )),
+        Text('move_agreed_with_driver'.tr, textAlign: TextAlign.center, style: textSemiBold.copyWith(
+            color: Theme.of(context).primaryColor,
+            fontSize: Dimensions.fontSizeLarge
+        )),
+      ] else ...[
       Text(_isShownPaidFare(tripDetails) ? 'your_trip_cost'.tr : 'estimated_trip_cost'.tr, style: textSemiBold.copyWith(
           color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
           fontSize: Dimensions.fontSizeSmall
@@ -155,6 +179,7 @@ class TripDetailsTopSectionWidget extends StatelessWidget {
             fontSize: Dimensions.fontSizeOverLarge
         ),
       ),
+      ],
 
       if(tripDetails?.type == AppConstants.scheduleRequest && (tripDetails?.currentStatus == AppConstants.pending || tripDetails?.currentStatus == AppConstants.accepted))
         Container(

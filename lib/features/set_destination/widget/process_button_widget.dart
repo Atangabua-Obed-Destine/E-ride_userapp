@@ -5,6 +5,7 @@ import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
 import 'package:ride_sharing_user_app/features/location/controllers/location_controller.dart';
 import 'package:ride_sharing_user_app/features/map/screens/map_screen.dart';
 import 'package:ride_sharing_user_app/features/ride/controllers/ride_controller.dart';
+import 'package:ride_sharing_user_app/features/ride/widgets/pickup_help.dart';
 import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 import 'package:ride_sharing_user_app/helper/display_helper.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
@@ -24,7 +25,7 @@ class ProcessButtonWidget extends StatelessWidget {
             rideController.loading ?
             SpinKitCircle(color: Theme.of(context).primaryColor, size: 40.0) :
             ButtonWidget(
-              onPressed: () {
+              onPressed: () async {
                 if(Get.find<ConfigController>().config!.maintenanceMode != null &&
                     Get.find<ConfigController>().config!.maintenanceMode!.maintenanceStatus == 1 &&
                     Get.find<ConfigController>().config!.maintenanceMode!.selectedMaintenanceSystem!.userApp == 1
@@ -48,9 +49,15 @@ class ProcessButtonWidget extends StatelessWidget {
                     showCustomSnackBar('destination_location_is_required'.tr);
                     FocusScope.of(context).requestFocus(destinationLocationFocus);
                   }else{
+                    // Asked once per booking: where exactly the driver finds the customer.
+                    if (!rideController.hasPickupHelp && !rideController.pickupHelpAsked) {
+                      FocusScope.of(context).unfocus();
+                      final bool? go = await PickupHelpSheet.show(asking: true);
+                      if (go != true) return;
+                    }
                     rideController.getEstimatedFare(false).then((value) {
                       if(value.statusCode == 200) {
-                        Get.to(() => const MapScreen(
+                        MapScreen.open(const MapScreen(
                           fromScreen: MapScreenType.ride,
                           isShowCurrentPosition: false,
                         ));

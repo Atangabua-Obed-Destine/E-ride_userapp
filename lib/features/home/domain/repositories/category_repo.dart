@@ -12,4 +12,9 @@ class CategoryRepo{
     return await apiClient.getData(AppConstants.vehicleMainCategory);
   }
 
+  /// E-Ride Move vehicles (tricycle, pickup, dyna, truck) offered in the zone.
+  Future<Response?> getMoveCategoryList() async {
+    return await apiClient.getData(AppConstants.moveVehicleCategory);
+  }
+
 }

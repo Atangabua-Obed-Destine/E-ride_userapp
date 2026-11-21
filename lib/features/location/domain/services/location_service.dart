@@ -13,6 +13,11 @@ class LocationService implements LocationServiceInterface{
   }
 
   @override
+  Future getSearchStartList() async {
+    return await locationRepositoryInterface.getSearchStartList();
+  }
+
+  @override
   Future getPlaceDetails(String placeID) async{
     return await locationRepositoryInterface.getPlaceDetails(placeID);
   }
@@ -33,8 +38,8 @@ class LocationService implements LocationServiceInterface{
   }
 
   @override
-  Future searchLocation(String text) async{
-    return await locationRepositoryInterface.searchLocation(text);
+  Future searchLocation(String text, {double? lat, double? lng}) async{
+    return await locationRepositoryInterface.searchLocation(text, lat: lat, lng: lng);
   }
 
 }

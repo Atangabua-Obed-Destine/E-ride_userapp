@@ -1,3 +1,5 @@
+import 'package:ride_sharing_user_app/features/message/controllers/chat_inbox_controller.dart';
+import 'package:ride_sharing_user_app/common_widgets/unread_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -25,6 +27,17 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   final bool showTripHistoryFilter;
   final bool showDiscountHint;
   final bool showBonusHint;
+  /// Replaces the logo in the leading slot with a menu button that opens the
+  /// nearest Scaffold's drawer. Only the home screen sets this.
+  final bool showMenuButton;
+  /// Height of the toolbar row, below the status bar. HomeScreen reads this
+  /// to place the hero search pill on the header/body seam.
+  static const double toolbarHeight = 70;
+
+  /// Where screens float their pill tab selector over this app bar: just
+  /// under the title, whatever the status bar height. (A share of the screen
+  /// height put the pills on the title on phones with a tall status bar.)
+  static double overlayTop(BuildContext context) => MediaQuery.paddingOf(context).top + 62;
   const AppBarWidget({
     super.key,
     required this.title,
@@ -37,7 +50,8 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
     this.showTripHistoryFilter = false,
     this.fontSize,
     this.showDiscountHint = false,
-    this.showBonusHint = false
+    this.showBonusHint = false,
+    this.showMenuButton = false,
   });
 
   @override
@@ -48,7 +62,7 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        toolbarHeight: 70,
+        toolbarHeight: toolbarHeight,
         automaticallyImplyLeading: false,
         title: InkWell(
           onTap: isHome ? () {
@@ -129,9 +143,32 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
           color: Get.isDarkMode ? Colors.white.withValues(alpha:0.8) : Colors.white,
           onPressed: () => onBackPressed != null ? onBackPressed!() : Navigator.canPop(context) ? Get.back() : Get.offAll(()=> const DashboardScreen()),
         ) :
+        showMenuButton ?
+        // Builder so the context is below the Scaffold that owns the drawer.
+        Builder(builder: (context) => IconButton(
+          tooltip: 'profile'.tr,
+          icon: GetBuilder<ChatInboxController>(builder: (inbox) => UnreadBadge(
+            count: inbox.totalUnread,
+            dot: true,
+            offset: const Offset(-1, -1),
+            borderColor: Theme.of(context).scaffoldBackgroundColor,
+            child: const Icon(Icons.menu_rounded),
+          )),
+          color: Get.isDarkMode ? Colors.white.withValues(alpha:0.8) : Colors.white,
+          onPressed: () => (DashboardScreen.scaffoldState ?? Scaffold.of(context)).openDrawer(),
+        )) :
         Padding(
-          padding: const EdgeInsets.all(Dimensions.paddingSize),
-          child: Image.asset(Images.icon,height: Get.height*0.01,width: Get.width*0.01),
+          padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault),
+          // Was the DriveMond green car hexagon (assets/image/icon.png). This is
+          // the E-Ride mark in the dark-background variant, because the app bar
+          // sits on scaffoldBackgroundColor (#222222) where the shipped logo's
+          // dark artwork would disappear.
+          child: Image.asset(
+            Images.brandMarkOnDark,
+            height: 30,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+          ),
         ),
 
         actions: [

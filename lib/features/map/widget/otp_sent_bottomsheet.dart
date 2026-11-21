@@ -1,10 +1,15 @@
+import 'package:ride_sharing_user_app/features/area_safety/widgets/area_safety_widgets.dart';
+import 'package:ride_sharing_user_app/features/health_ride/widgets/health_ride_widgets.dart';
+import 'package:ride_sharing_user_app/features/ride/widgets/drop_price_ride_note.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/features/move/widgets/move_widgets.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/expandable_bottom_sheet.dart';
 import 'package:ride_sharing_user_app/common_widgets/swipable_button_widget/slider_button_widget.dart';
 import 'package:ride_sharing_user_app/features/dashboard/controllers/bottom_menu_controller.dart';
+import 'package:ride_sharing_user_app/features/deposit/widgets/deposit_widgets.dart';
 import 'package:ride_sharing_user_app/features/home/widgets/banner_shimmer.dart';
 import 'package:ride_sharing_user_app/features/location/controllers/location_controller.dart';
 import 'package:ride_sharing_user_app/features/map/controllers/map_controller.dart';
@@ -18,6 +23,7 @@ import 'package:ride_sharing_user_app/features/splash/controllers/config_control
 import 'package:ride_sharing_user_app/features/trip/controllers/trip_controller.dart';
 import 'package:ride_sharing_user_app/features/trip/widgets/rider_details.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
+import 'package:ride_sharing_user_app/features/trip_share/widgets/share_trip_card.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
 
@@ -41,17 +47,29 @@ class _OtpSentBottomSheetState extends State<OtpSentBottomSheet> {
       return GetBuilder<LocationController>(builder: (locationController){
         return currentState == 0 ? rideController.tripDetails != null ?
         Column(children: [
-          TollTipWidget(title: '${ (rideController.remainingDistanceModel.isNotEmpty) ?  (rideController.remainingDistanceModel[0].duration)?? '0' : '0'} ${'away'.tr}'),
-          const SizedBox(height: Dimensions.paddingSizeDefault),
+          // Waiting for the deposit: the driver sets off once it is paid.
+          if (rideController.tripDetails!.deposit?.isAwaiting ?? false)
+            DepositCard(trip: rideController.tripDetails!)
+          else ...[
+            TollTipWidget(title: '${ (rideController.remainingDistanceModel.isNotEmpty) ?  (rideController.remainingDistanceModel[0].duration)?? '0' : '0'} ${'away'.tr}'),
+            const SizedBox(height: Dimensions.paddingSizeDefault),
 
-          if(Get.find<ConfigController>().config?.otpConfirmationForTrip ?? false)
-          const OtpWidget(isParcel: true),
+            if(Get.find<ConfigController>().config?.otpConfirmationForTrip ?? false)
+            const OtpWidget(isParcel: true),
+            DepositCard(trip: rideController.tripDetails!),
+            MoveNoAgreementButton(trip: rideController.tripDetails!),
+          ],
 
           const ActivityScreenRiderDetails(),
           const SizedBox(height: Dimensions.paddingSizeDefault),
+          const ShareTripCard(),
+          const ReportDangerLink(),
 
           const EstimatedFareAndDistance(),
           const SizedBox(height: Dimensions.paddingSizeDefault),
+
+          if (rideController.tripDetails!.isMove)
+            MoveLoadSummary(trip: rideController.tripDetails!),
 
           RouteWidget(totalDistance: rideController.tripDetails?.estimatedDistance.toString() ?? '',
               fromAddress: rideController.tripDetails?.pickupAddress??"",
@@ -60,6 +78,14 @@ class _OtpSentBottomSheetState extends State<OtpSentBottomSheet> {
               extraTwoAddress: widget.secondRoute,
               entrance:  rideController.tripDetails?.entrance??''),
           const SizedBox(height: Dimensions.paddingSizeDefault),
+
+          // Drop price: holds when the ride ends at the destination.
+          if (rideController.tripDetails!.isDropFare) DropPriceRideNote(trip: rideController.tripDetails!),
+          // Health ride: the numbers to call stay at hand.
+          if (rideController.tripDetails!.isHealthRide) ...[
+            const HealthRideNotice(compact: true),
+            const SizedBox(height: Dimensions.paddingSizeSmall),
+          ],
 
           if (rideController.tripDetails?.pickupNote != null && (rideController.tripDetails?.pickupNote ?? '').isNotEmpty) ...[
             Container(
@@ -124,6 +150,7 @@ class _OtpSentBottomSheetState extends State<OtpSentBottomSheet> {
 
           const SizedBox(height: Dimensions.paddingSizeSmall,),
 
+          DepositCancelNote(deposit: rideController.tripDetails?.deposit),
           CancellationRadioButton(isOngoing: false,expandableKey: widget.expandableKey),
 
           const SizedBox(height: Dimensions.paddingSizeLarge),

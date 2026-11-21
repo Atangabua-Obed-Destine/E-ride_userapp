@@ -4,8 +4,9 @@ import 'package:ride_sharing_user_app/features/address/domain/models/address_mod
 abstract class LocationServiceInterface{
   Future<dynamic> getZone(String lat, String lng);
   Future<dynamic> getAddressFromGeocode(LatLng? latLng);
-  Future<dynamic> searchLocation(String text);
+  Future<dynamic> searchLocation(String text, {double? lat, double? lng});
   Future<dynamic> getPlaceDetails(String placeID);
+  Future<dynamic> getSearchStartList();
   Future<bool> saveUserAddress(Address? address);
   String? getUserAddress();
 }

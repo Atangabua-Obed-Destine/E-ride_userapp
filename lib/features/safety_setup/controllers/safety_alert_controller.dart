@@ -211,6 +211,11 @@ class SafetyAlertController extends GetxController implements GetxService {
   Position? oldPosition, newLocation;
 
   void checkDriverNeedSafety() async{
+    // The check-in belongs to the admin's safety feature: off means no check.
+    if (!(Get.find<ConfigController>().config?.safetyFeatureStatus ?? false)) {
+      _timer?.cancel();
+      return;
+    }
 
     oldPosition = await Geolocator.getCurrentPosition(
         locationSettings: LocationSettings(accuracy: LocationAccuracy.low)
@@ -228,7 +233,11 @@ class SafetyAlertController extends GetxController implements GetxService {
       if(distance > 20){
         oldPosition = newLocation;
       }else {
-        if(!(Get.isBottomSheetOpen ?? false) && !((Get.find<RideController>().remainingDistanceModel[0].durationSec ?? 0) < (Get.find<RideController>().remainingDistanceModel[0].durationInTrafficSec ?? 0))){
+        final RideController ride = Get.find<RideController>();
+        // A paused trip is standing still on purpose (paid waiting).
+        final bool paused = ride.tripDetails?.isPaused ?? false;
+        final bool slowTraffic = ride.remainingDistanceModel.isNotEmpty && ((ride.remainingDistanceModel[0].durationSec ?? 0) < (ride.remainingDistanceModel[0].durationInTrafficSec ?? 0));
+        if(!paused && !(Get.isBottomSheetOpen ?? false) && !slowTraffic){
           Get.bottomSheet(
             isScrollControlled: true,
             const SafetyAlertDelayWidget(),

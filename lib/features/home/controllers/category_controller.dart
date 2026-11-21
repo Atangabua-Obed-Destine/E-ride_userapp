@@ -11,7 +11,25 @@ class CategoryController extends GetxController implements GetxService{
 
   int couponFilterIndex = 0;
   List<Category>? categoryList;
+  /// E-Ride Move vehicles; ride lists never include them.
+  List<Category>? moveCategoryList;
   bool isLoading = false;
+
+  /// The list the vehicle picker shows: ride vehicles, or the move vehicles.
+  List<Category>? listFor(bool move) => move ? moveCategoryList : categoryList;
+
+  Future<void> getMoveCategoryList() async {
+    moveCategoryList = null;
+    update();
+    Response? response = await categoryRepo.getMoveCategoryList();
+    if(response!.statusCode == 200 && response.body['data'] != null) {
+      moveCategoryList = CategoryModel.fromJson(response.body).data ?? [];
+    }else{
+      moveCategoryList = [];
+      ApiChecker.checkApi(response);
+    }
+    update();
+  }
 
   Future<void> getCategoryList() async {
     Response? response = await categoryRepo.getCategoryList();

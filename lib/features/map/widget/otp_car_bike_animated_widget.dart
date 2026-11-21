@@ -38,7 +38,7 @@ class _OtpCarBikeAnimatedWidgetState extends State<OtpCarBikeAnimatedWidget> wit
          Center(child: Center(child: SlideTransition(
           position: leftSlideAnimation,
           child: SvgPicture.asset(
-            (Get.find<RideController>().tripDetails?.vehicleCategory?.type ?? 'car') == 'car' ?
+            (Get.find<RideController>().tripDetails?.vehicleCategory?.type ?? 'car') != 'motor_bike' ?
             Images.animatedCar : Images.animatedBike,
             height: Get.height * 0.12,width: Get.width * 0.1,
           ),

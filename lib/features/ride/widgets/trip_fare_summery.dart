@@ -26,15 +26,20 @@ class TripFareSummery extends StatelessWidget {
       return GetBuilder<CouponController>(builder: (couponController) {
         return GetBuilder<PaymentController>(builder: (paymentController) {
           double total = 0;
+          double deposit = 0;
           if (fromPayment) {
             total = (rideController.finalFare?.paidFare ?? 0) + double.parse(paymentController.tipAmount);
+            // The booking deposit already paid counts toward the fare.
+            deposit = rideController.finalFare?.depositCredit(total) ?? 0;
+            total -= deposit;
           } else {
             total = rideController.tripDetails?.paidFare ?? 0;
           }
           return Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-              color: fromPayment ? null : Theme.of(context).hintColor.withValues(alpha:0.06),
+              borderRadius: BorderRadius.circular(18),
+              color: fromPayment ? null : Theme.of(context).cardColor,
+              border: fromPayment ? null : Border.all(color: Theme.of(context).hintColor.withValues(alpha: 0.18)),
             ),
             padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
             child: Column(children: [
@@ -61,83 +66,83 @@ class TripFareSummery extends StatelessWidget {
                       ),
                     const SizedBox(width: Dimensions.paddingSizeExtraSmall),
 
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall)
-                      ),
-                      padding: EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeExtraSmall),
-                      child: Text(' ${PriceConverter.convertPrice(
-                          discountAmount != null && (discountAmount ?? 0).toDouble() > 0 ? discountFare ?? 0 : tripFare ?? 0)}',
-                        style: textRobotoBold.copyWith(
-                          fontSize: Dimensions.fontSizeSmall,
-                          color: Theme.of(context).textTheme.bodyMedium?.color,
-                        ),
+                    Text(PriceConverter.convertPrice(
+                        discountAmount != null && (discountAmount ?? 0).toDouble() > 0 ? discountFare ?? 0 : tripFare ?? 0),
+                      style: textBold.copyWith(
+                        fontSize: Dimensions.fontSizeExtraLarge,
+                        color: Theme.of(context).primaryColor,
                       ),
                     ),
                   ])
                 ]),
 
-              if(fromPayment)...[
-                (rideController.finalFare?.discountAmount ?? 0).toDouble() > 0 ?
-                Padding(
-                  padding: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
-                  child: Row(children: [
-                    SizedBox(width: Dimensions.iconSizeSmall, child: Image.asset(
-                      Images.farePrice, color: Theme.of(context).primaryColor,
-                    )),
-                    const SizedBox(width: Dimensions.paddingSizeSmall),
+              // if(fromPayment)...[
+              //   (rideController.finalFare?.discountAmount ?? 0).toDouble() > 0 ?
+              //   Padding(
+              //     padding: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
+              //     child: Row(children: [
+              //       SizedBox(width: Dimensions.iconSizeSmall, child: Image.asset(
+              //         Images.farePrice, color: Theme.of(context).primaryColor,
+              //       )),
+              //       const SizedBox(width: Dimensions.paddingSizeSmall),
+              //
+              //       Expanded(child: Row(children: [
+              //         Text('fare_fee'.tr, style: textMedium.copyWith(
+              //           color: Theme.of(context).primaryColor,
+              //         )),
+              //
+              //         Container(
+              //             decoration: BoxDecoration(
+              //               color: Theme.of(context).colorScheme.error.withValues(alpha:0.10),
+              //               borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall),
+              //             ),
+              //             padding: const EdgeInsets.symmetric(
+              //               horizontal: Dimensions.paddingSizeExtraSmall,
+              //             ),
+              //             margin: const EdgeInsets.only(left: Dimensions.paddingSizeExtraSmall),
+              //             child: Text(
+              //               (rideController.finalFare?.discount == null) && ((rideController.finalFare?.discountAmount ?? 0 ) > 0) ?
+              //               '${PriceConverter.convertPrice((rideController.finalFare?.discountAmount ?? 0).toDouble())} ${'off'.tr}' :
+              //               rideController.finalFare?.discount?.discountAmountType == 'percentage' ?
+              //               '${rideController.finalFare?.discount?.discountAmount}% ${'off'.tr}' :
+              //               '${PriceConverter.convertPrice((rideController.finalFare?.discount?.discountAmount ?? 0).toDouble())} ${'off'.tr}',
+              //               style: textRobotoRegular.copyWith(color: Theme.of(context).colorScheme.error),
+              //             )
+              //         )
+              //       ])),
+              //
+              //       Text(
+              //         PriceConverter.convertPrice(rideController.finalFare?.distanceWiseFare ?? 0),
+              //         style: textRobotoRegular.copyWith(
+              //           color: Theme.of(context).hintColor,
+              //           decorationColor: Theme.of(context).hintColor,
+              //           decoration: TextDecoration.lineThrough,
+              //         ),
+              //       ),
+              //
+              //       Text(
+              //         ' ${PriceConverter.convertPrice(
+              //             (rideController.finalFare?.distanceWiseFare ?? 0) -
+              //                 (rideController.finalFare?.discountAmount ?? 0))}',
+              //         style: textRobotoRegular.copyWith(color: Theme.of(context).primaryColor),
+              //       ),
+              //
+              //     ]),
+              //   ) :
+              //
+              //   PaymentItemInfoWidget(
+              //     icon: Images.farePrice,
+              //     title: 'fare_fee'.tr,
+              //     amount: rideController.finalFare?.distanceWiseFare ?? 0,
+              //   ),
+              // ],
 
-                    Expanded(child: Row(children: [
-                      Text('fare_fee'.tr, style: textMedium.copyWith(
-                        color: Theme.of(context).primaryColor,
-                      )),
-
-                      Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.error.withValues(alpha:0.10),
-                            borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Dimensions.paddingSizeExtraSmall,
-                          ),
-                          margin: const EdgeInsets.only(left: Dimensions.paddingSizeExtraSmall),
-                          child: Text(
-                            (rideController.finalFare?.discount == null) && ((rideController.finalFare?.discountAmount ?? 0 ) > 0) ?
-                            '${PriceConverter.convertPrice((rideController.finalFare?.discountAmount ?? 0).toDouble())} ${'off'.tr}' :
-                            rideController.finalFare?.discount?.discountAmountType == 'percentage' ?
-                            '${rideController.finalFare?.discount?.discountAmount}% ${'off'.tr}' :
-                            '${PriceConverter.convertPrice((rideController.finalFare?.discount?.discountAmount ?? 0).toDouble())} ${'off'.tr}',
-                            style: textRobotoRegular.copyWith(color: Theme.of(context).colorScheme.error),
-                          )
-                      )
-                    ])),
-
-                    Text(
-                      PriceConverter.convertPrice(rideController.finalFare?.distanceWiseFare ?? 0),
-                      style: textRobotoRegular.copyWith(
-                        color: Theme.of(context).hintColor,
-                        decorationColor: Theme.of(context).hintColor,
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-
-                    Text(
-                      ' ${PriceConverter.convertPrice(
-                          (rideController.finalFare?.distanceWiseFare ?? 0) -
-                              (rideController.finalFare?.discountAmount ?? 0))}',
-                      style: textRobotoRegular.copyWith(color: Theme.of(context).primaryColor),
-                    ),
-
-                  ]),
-                ) :
-
+              if(fromPayment)
                 PaymentItemInfoWidget(
                   icon: Images.farePrice,
-                  title: 'fare_fee'.tr,
+                  title: (rideController.finalFare?.isDropFare ?? false) ? 'drop_price_fare'.tr : 'fare_fee'.tr,
                   amount: rideController.finalFare?.distanceWiseFare ?? 0,
                 ),
-              ],
 
               if(fromPayment && !fromParcel && (rideController.finalFare?.cancellationFee ?? 0.toDouble()) > 0)
                 PaymentItemInfoWidget(
@@ -168,6 +173,14 @@ class TripFareSummery extends StatelessWidget {
                   discount: true,
                 ),
 
+              if(fromPayment && ((rideController.finalFare?.discountAmount ?? 0).toDouble() > 0))
+                PaymentItemInfoWidget(
+                  icon: Images.discount,
+                  title: 'discount'.tr,
+                  amount: rideController.finalFare?.discountAmount ?? 0,
+                  discount: true,
+                ),
+
               if(fromPayment && (rideController.finalFare?.vatTax ?? 0).toDouble() > 0)
                 PaymentItemInfoWidget(
                   icon: Images.farePrice,
@@ -182,8 +195,16 @@ class TripFareSummery extends StatelessWidget {
                   toolTipText: 'tips_tooltip',
                 ),
 
+              if(fromPayment && deposit > 0)
+                PaymentItemInfoWidget(
+                  icon: Images.profileMyWallet,
+                  title: 'deposit_already_paid'.tr,
+                  amount: deposit,
+                  discount: true,
+                ),
+
               if(fromPayment)
-                PaymentItemInfoWidget(title: 'sub_total'.tr, amount: total, isSubTotal: true),
+                PaymentItemInfoWidget(title: deposit > 0 ? 'left_to_pay'.tr : 'sub_total'.tr, amount: total, isSubTotal: true),
 
               if(!fromPayment)
                 const SizedBox(height: Dimensions.paddingSizeSmall),
@@ -206,21 +227,19 @@ class TripFareSummery extends StatelessWidget {
                     SizedBox(
                       width: 120,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(
-                          Dimensions.paddingSizeExtraSmall,
-                        )),
+                        padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSize),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).hintColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
+                        ),
                         child: DropdownButton<String>(
-                          value: paymentController.paymentTypeIndex == 0 ?
-                          'cash' :
-                          paymentController.paymentTypeIndex == 1 ?
-                          'digital' :
-                          'wallet',
-                          items: paymentController.paymentTypeList.map((String value) {
+                          // Only the ways the admin offers (cash and the wallet can be off).
+                          value: paymentController.offeredPaymentType,
+                          items: paymentController.shownPaymentTypes.map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
                               child: Text(value.tr,
-                                style: textRegular.copyWith(fontSize: Dimensions.fontSizeDefault,color: Theme.of(context).primaryColor),
+                                style: textSemiBold.copyWith(fontSize: Dimensions.fontSizeDefault, color: Theme.of(context).textTheme.bodyLarge?.color),
                                 textAlign: TextAlign.right,
                               ),
                             );
@@ -235,13 +254,15 @@ class TripFareSummery extends StatelessWidget {
                                 subMessage: '${'wallet_balance'.tr}: ${PriceConverter.convertPrice(Get.find<ProfileController>().profileModel?.data?.wallet?.walletBalance ?? 0)}'
                               );
                             }else{
-                               paymentController.setPaymentType(value == 'cash' ? 0 : value == 'digital' ? 1 : 2);
+                               paymentController.selectPaymentType(value ?? 'digital');
                             }
                           },
                           isExpanded: true,
                           underline: const SizedBox(),
-                          iconEnabledColor: Theme.of(context).primaryColor,
-                          icon: Icon(Icons.keyboard_arrow_down_rounded),
+                          iconEnabledColor: Theme.of(context).textTheme.bodyLarge?.color,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                          dropdownColor: Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
                         ),
                       ),
                     )

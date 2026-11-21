@@ -9,4 +9,7 @@ abstract class MessageServiceInterface{
   Future<Response> sendMessage(String message,String channelID, String tripId, List<MultipartBody> file, PlatformFile? platformFile);
   Future<dynamic> findChannelRideStatus(String channelId);
 
+  Future<Response> markChatRead(String channelId);
+  Future<Response> sendTyping(String channelId, {bool typing = true});
+  Future<Response> getUnreadSummary();
 }

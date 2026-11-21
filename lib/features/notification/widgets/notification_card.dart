@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:ride_sharing_user_app/features/my_offer/screens/my_offer_screen.dart';
 import 'package:ride_sharing_user_app/features/notification/controllers/notification_controller.dart';
 import 'package:ride_sharing_user_app/features/notification/domain/models/notification_model.dart';
-import 'package:ride_sharing_user_app/features/refer_and_earn/controllers/refer_and_earn_controller.dart';
-import 'package:ride_sharing_user_app/features/refer_and_earn/screens/refer_and_earn_screen.dart';
-import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
-import 'package:ride_sharing_user_app/features/trip/screens/trip_details_screen.dart';
-import 'package:ride_sharing_user_app/features/wallet/screens/wallet_screen.dart';
+import 'package:ride_sharing_user_app/features/notification/helpers/notification_open.dart';
 import 'package:ride_sharing_user_app/helper/date_converter.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/images.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
 
+/// One notification: icon tile (red while unread, grey once read), title,
+/// one-line description, time, and a red dot for unread. Day labels are
+/// drawn as small uppercase eyebrows between groups. Tapping marks it read
+/// and opens the detail sheet, exactly as before.
 class NotificationCard extends StatelessWidget {
   final Notifications notification;
   final Notifications? previousNotification;
@@ -20,212 +19,204 @@ class NotificationCard extends StatelessWidget {
   final int? index;
   const NotificationCard({super.key, required this.notification, required this.nextNotification, required this.previousNotification, this.index});
 
+  bool get _read => notification.isRead ?? false;
+
   @override
   Widget build(BuildContext context) {
     int currentNotificationMinutes = calculateMinute(notification.createdAt!);
-    return InkWell(
-      onTap: () {
-        Get.find<NotificationController>().sendReadStatus(notification.id ?? 0, index ?? 0);
-        Get.bottomSheet(Container(
-          width: Get.width,
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius:const BorderRadius.only(
-              topLeft: Radius.circular(Dimensions.paddingSizeLarge),
-              topRight: Radius.circular(Dimensions.paddingSizeLarge),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-            child: Column(mainAxisSize: MainAxisSize.min,children: [
-              const SizedBox(height: Dimensions.paddingSizeLarge),
+    final Color hint = Theme.of(context).hintColor;
+    final Color text = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final Color accent = Theme.of(context).primaryColor;
+    final Color tone = _read ? hint : accent;
 
-              Container(
-                padding: const EdgeInsets.all(Dimensions.paddingSize),
-                margin: const EdgeInsets.only(right: Dimensions.paddingSizeSmall),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withValues(alpha:0.10),
-                  borderRadius: BorderRadius.circular(Dimensions.paddingSizeSmall),
-                ),
-                child: Image.asset(
-                  _getIcons(notification.notificationType ?? ''),
-                  width: 20,height: 20,
-                  fit: BoxFit.cover,
-                  color: Theme.of(context).primaryColor,
-                ),
-              ),
-              const SizedBox(height: Dimensions.paddingSizeSmall),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if(previousNotification == null)
+        _DayLabel(text: _dayText(notification.createdAt!)),
 
-              Text(notification.title ?? '',
-                  style: textBold.copyWith(fontSize: 16,color: Get.isDarkMode ? Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.9) : null),
-                  textAlign: TextAlign.center
-              ),
-              const SizedBox(height: Dimensions.paddingSizeSmall),
-
-              Text(
-                notification.description ?? '',textAlign: TextAlign.center,
-                style: textRegular.copyWith(
-                    color: Get.isDarkMode ? Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.8) : null
-                ),
-              ),
-              const SizedBox(height: Dimensions.paddingSizeSmall),
-
-                InkWell(
-                    onTap: (){
-                      if(notification.action == 'referral_reward_received'){
-                        Get.find<ReferAndEarnController>().updateCurrentTabIndex(1,isUpdate: true);
-                        Get.to(() => const ReferAndEarnScreen());
-                      }else if(notification.action == 'someone_used_your_code' && (Get.find<ConfigController>().config?.referralEarningStatus ?? false)){
-                        Get.find<ReferAndEarnController>().updateCurrentTabIndex(0,isUpdate: true);
-                        Get.to(() => const ReferAndEarnScreen());
-                      }else if(notification.action == 'parcel_refund_request_approved' || notification.action == 'parcel_refund_request_denied'){
-                        Get.to(() =>  TripDetailsScreen(tripId: notification.rideRequestId ?? ''));
-                      }else if(notification.action == 'refunded_as_coupon'){
-                        Get.to(() => MyOfferScreen(isCoupon: true));
-                      }else{
-                        Get.to(() => const WalletScreen());
-                      }
-                    },
-                    child: Text(
-                      notification.action == 'referral_reward_received' ?
-                        'earning_history'.tr :
-                      notification.action == 'someone_used_your_code' && (Get.find<ConfigController>().config?.referralEarningStatus ?? false) ?
-                      'referral_details'.tr :
-                      notification.action == 'parcel_refund_request_approved' || notification.action == 'parcel_refund_request_denied' ?
-                      'parcel_details'.tr :
-                      notification.action == 'refunded_as_coupon' ?
-                      'coupons'.tr :
-                      notification.action == 'refunded_to_wallet' ?
-                      'my_wallet'.tr : '',
-                        style: textRegular.copyWith(color: Theme.of(context).colorScheme.surfaceContainer,decoration: TextDecoration.underline),
-                    )
-                ),
-              const SizedBox(height: 30),
-            ]),
-          ),
-        ));
-      },
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if(previousNotification == null)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
-          child: Text(DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) ==  DateConverter.localDateTimeToDateAndMonthOnly(DateTime.now()) ?
-          'today'.tr :
-          DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) ==  DateConverter.localDateTimeToDateAndMonthOnly(DateTime.now().subtract(const Duration(days: 1))) ?
-          'last_day'.tr :
-          DateConverter.isoDateTimeStringToDateOnly(notification.createdAt!),
-          style: textRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.4))),
-        ),
-
-        Container(
+      Material(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openDetails(context),
+          child: Container(
+            padding: const EdgeInsets.all(Dimensions.paddingSize),
+            margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
             decoration: BoxDecoration(
-              color: Get.isDarkMode ?
-              Theme.of(context).scaffoldBackgroundColor :
-              Theme.of(context).hintColor.withValues(alpha:0.07),
-              borderRadius: const BorderRadius.all(Radius.circular(Dimensions.radiusLarge)),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: hint.withValues(alpha: 0.14)),
             ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: Dimensions.paddingSizeDefault,
-              vertical: Dimensions.paddingSizeLarge,
-            ),
-            margin: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(children: [
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Container(
-                padding: const EdgeInsets.all(Dimensions.paddingSize),
-                margin: const EdgeInsets.only(right: Dimensions.paddingSizeSmall),
-                decoration: BoxDecoration(
-                  color: (notification.isRead ?? false) ?
-                  Theme.of(context).hintColor.withValues(alpha:0.10) :
-                  Theme.of(context).primaryColor.withValues(alpha:0.10),
-                  borderRadius: BorderRadius.circular(Dimensions.paddingSizeSmall),
-                ),
-                child: Image.asset(
-                  _getIcons(notification.notificationType ?? ''),
-                  width: 20,height: 20,
-                  fit: BoxFit.cover,
-                  color: (notification.isRead ?? false) ?
-                  Theme.of(context).hintColor :
-                  Theme.of(context).primaryColor,
-                ),
+                width: 42, height: 42,
+                decoration: BoxDecoration(color: tone.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(13)),
+                child: Center(child: _groupIcon(notification.group) != null
+                    ? Icon(_groupIcon(notification.group), size: 21, color: tone)
+                    : Image.asset(
+                        _getIcons(notification.notificationType ?? ''),
+                        width: 20, height: 20, fit: BoxFit.contain, color: tone,
+                      )),
               ),
+              const SizedBox(width: Dimensions.paddingSize),
 
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Expanded(child: Padding(
-                      padding: const EdgeInsets.only(right: Dimensions.paddingSizeExtraLarge),
-                      child: Text(notification.title ?? '',
-                        style: (notification.isRead ?? false) ? textRegular.copyWith(
-                            fontSize: Dimensions.fontSizeDefault,
-                            color: Theme.of(context).textTheme.bodyMedium!.color!
-                        ) : textBold,
-                        maxLines: 1,overflow: TextOverflow.ellipsis,
-                      ),
-                    )),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeExtraSmall),
-                      child: Row(children: [
-                        Text(
-                          currentNotificationMinutes < 1 ? 'just_now'.tr
-                              : currentNotificationMinutes < 60 ? '$currentNotificationMinutes ${'min_ago'.tr}'
-                              : DateConverter.isoDateTimeStringToLocalTime(notification.createdAt!),
-                          style: textRegular.copyWith(
-                            fontSize: Dimensions.fontSizeExtraSmall,
-                            color: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.color
-                                ?.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                        Icon(
-                          Icons.alarm,
-                          size: Dimensions.fontSizeLarge,
-                          color: Theme.of(context).hintColor.withValues(alpha:0.5),
-                        ),
-                      ]),
-                    ),
-                  ]),
-
-                  Text(notification.description ?? '',maxLines: 1,overflow: TextOverflow.ellipsis,
-                      style: textRegular.copyWith(
-                          color: (notification.isRead ?? false) ?
-                          Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.4) :
-                          Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.8),
-                      )
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: Text(
+                    notification.title ?? '',
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: (_read ? textMedium : textSemiBold).copyWith(fontSize: Dimensions.fontSizeDefault, color: text),
+                  )),
+                  const SizedBox(width: Dimensions.paddingSizeSmall),
+                  Text(
+                    currentNotificationMinutes < 1 ? 'just_now'.tr
+                        : currentNotificationMinutes < 60 ? '$currentNotificationMinutes ${'min_ago'.tr}'
+                        : DateConverter.isoDateTimeStringToLocalTime(notification.createdAt!),
+                    style: textRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: hint),
                   ),
-
+                  if (!_read) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 8, height: 8,
+                      margin: const EdgeInsets.only(top: 4),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
+                    ),
+                  ],
                 ]),
-              ),
+                const SizedBox(height: 3),
+
+                Text(
+                  notification.description ?? '',
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: textRegular.copyWith(
+                    fontSize: Dimensions.fontSizeSmall,
+                    color: _read ? hint : text.withValues(alpha: 0.8),
+                  ),
+                ),
+              ])),
             ]),
           ),
+        ),
+      ),
 
-          if(((nextNotification == null) && (previousNotification != null) &&
-              (DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) != DateConverter.isoStringToLocalDateAndMonthOnly(previousNotification!.createdAt!))))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
-              child: Text(DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) ==  DateConverter.localDateTimeToDateAndMonthOnly(DateTime.now().subtract(const Duration(days: 1))) ?
-              'last_day'.tr :
-              DateConverter.isoDateTimeStringToDateOnly(notification.createdAt ?? '2024-07-13T04:59:40.000000Z'),
-              style: textRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.4))),
-            ),
+      if(((nextNotification == null) && (previousNotification != null) &&
+          (DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) != DateConverter.isoStringToLocalDateAndMonthOnly(previousNotification!.createdAt!))))
+        _DayLabel(text: _dayText(notification.createdAt ?? '2024-07-13T04:59:40.000000Z', todayAllowed: false)),
 
-          if((nextNotification != null) &&
-              (DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) != DateConverter.isoStringToLocalDateAndMonthOnly(nextNotification!.createdAt!)))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
-              child: Text(DateConverter.isoStringToLocalDateAndMonthOnly(nextNotification!.createdAt!) ==  DateConverter.localDateTimeToDateAndMonthOnly(DateTime.now().subtract(const Duration(days: 1))) ?
-              'last_day'.tr :
-              DateConverter.isoDateTimeStringToDateOnly(nextNotification?.createdAt ?? '2024-07-13T04:59:40.000000Z'),
-              style: textRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.4))),
+      if((nextNotification != null) &&
+          (DateConverter.isoStringToLocalDateAndMonthOnly(notification.createdAt!) != DateConverter.isoStringToLocalDateAndMonthOnly(nextNotification!.createdAt!)))
+        _DayLabel(text: _dayText(nextNotification?.createdAt ?? '2024-07-13T04:59:40.000000Z', todayAllowed: false)),
+    ]);
+  }
+
+  static String _dayText(String iso, {bool todayAllowed = true}) {
+    final String day = DateConverter.isoStringToLocalDateAndMonthOnly(iso);
+    if (todayAllowed && day == DateConverter.localDateTimeToDateAndMonthOnly(DateTime.now())) return 'today'.tr;
+    if (day == DateConverter.localDateTimeToDateAndMonthOnly(DateTime.now().subtract(const Duration(days: 1)))) return 'last_day'.tr;
+    return DateConverter.isoDateTimeStringToDateOnly(iso);
+  }
+
+  void _openDetails(BuildContext context) {
+    Get.find<NotificationController>().sendReadStatus(notification.id ?? 0, index ?? 0);
+    Get.bottomSheet(Container(
+      width: Get.width,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 44, height: 4,
+            margin: const EdgeInsets.only(top: 4, bottom: Dimensions.paddingSizeLarge),
+            decoration: BoxDecoration(
+              color: Theme.of(context).hintColor.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(2),
             ),
-      ]),
+          ),
+
+          Container(
+            width: 56, height: 56,
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(child: _groupIcon(notification.group) != null
+                ? Icon(_groupIcon(notification.group), size: 26, color: Theme.of(context).primaryColor)
+                : Image.asset(
+                    _getIcons(notification.notificationType ?? ''),
+                    width: 24, height: 24, fit: BoxFit.contain,
+                    color: Theme.of(context).primaryColor,
+                  )),
+          ),
+          const SizedBox(height: Dimensions.paddingSizeDefault),
+
+          Text(notification.title ?? '',
+              style: textBold.copyWith(fontSize: Dimensions.fontSizeLarge),
+              textAlign: TextAlign.center
+          ),
+          const SizedBox(height: Dimensions.paddingSizeSmall),
+
+          Text(
+            notification.description ?? '', textAlign: TextAlign.center,
+            style: textRegular.copyWith(color: Theme.of(context).hintColor),
+          ),
+          const SizedBox(height: Dimensions.paddingSizeDefault),
+
+          // Where it needs the person: the chat, the order, the job, the trip...
+          if (NotificationOpen.label(notification) != null) ...[
+            const SizedBox(height: Dimensions.paddingSizeSmall),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                onPressed: () {
+                  Get.back();
+                  NotificationOpen.open(notification);
+                },
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: Text(NotificationOpen.label(notification)!.tr, style: textSemiBold.copyWith(color: Colors.white)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 30),
+        ]),
+      ),
+    ));
+  }
+}
+
+class _DayLabel extends StatelessWidget {
+  final String text;
+  const _DayLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, Dimensions.paddingSizeSmall, 0, Dimensions.paddingSizeSmall),
+      child: Text(
+        text.toUpperCase(),
+        style: textSemiBold.copyWith(
+          fontSize: Dimensions.fontSizeExtraSmall,
+          letterSpacing: 1.2,
+          color: Theme.of(context).hintColor,
+        ),
+      ),
     );
   }
 }
+
+/// Parts of E-Ride without their own notification image get an icon that says where the notification is from.
+IconData? _groupIcon(String? group) => switch (group) {
+      'travel' => Icons.directions_bus_outlined,
+      'market' => Icons.storefront_outlined,
+      'jobs' => Icons.work_outline_rounded,
+      'homes' => Icons.home_work_outlined,
+      'food' => Icons.restaurant_outlined,
+      'safety' => Icons.shield_outlined,
+      _ => null,
+    };
 
 String _getIcons(String notificationType){
   switch (notificationType) {
@@ -272,4 +263,3 @@ int calculateMinute(String isoDateTime){
   DateTime dateTime = DateConverter.isoStringToLocalDate(isoDateTime);
   return DateTime.now().difference(dateTime).inMinutes;
 }
-

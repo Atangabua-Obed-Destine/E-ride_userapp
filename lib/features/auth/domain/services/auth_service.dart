@@ -1,5 +1,6 @@
 import 'package:ride_sharing_user_app/data/api_client.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/models/sign_up_body.dart';
+import 'package:ride_sharing_user_app/features/auth/domain/models/social_log_in_body.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/repositories/auth_repository_interface.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/services/auth_service_interface.dart';
 
@@ -160,6 +161,16 @@ class AuthService implements AuthServiceInterface{
   @override
   Future<dynamic> registrationFromOtp(SignUpBody signUpBody, {required bool updateFromRegistration, Map<String, dynamic>? additionalData, List<MultipartBody>? additionalFiles}) async{
    return await authRepositoryInterface.registrationFromOtp(signUpBody, updateFromRegistration: updateFromRegistration, additionalFiles: additionalFiles, additionalData: additionalData);
+  }
+
+  @override
+  Future<dynamic> registrationFromSocialLogin(SignUpBody signUpBody, {Map<String, dynamic>? additionalData, List<MultipartBody>? additionalFiles}) async{
+   return await authRepositoryInterface.registrationFromSocialLogin(signUpBody, additionalFiles: additionalFiles, additionalData: additionalData);
+  }
+
+  @override
+  Future<dynamic> loginWithSocialMedia(SocialLogInBody socialLogInBody) async{
+    return await authRepositoryInterface.loginWithSocialMedia(socialLogInBody);
   }
 
 }

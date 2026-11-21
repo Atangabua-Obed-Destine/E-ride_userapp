@@ -36,14 +36,14 @@ class RideService implements RideServiceInterface{
     required String destinationAddress, LatLng? extraOneLatLng = const LatLng(0, 0),
     LatLng? extraTwoLatLng = const LatLng(0, 0), bool extraOne = false, bool extraTwo = false,
     String? parcelWeight, String? parcelCategoryId, String? rideRequestType,
-    required String? scheduledAt,
+    required String? scheduledAt, Map<String, dynamic>? extra,
   })async {
     return await rideRepositoryInterface.getEstimatedFare(
         pickupLatLng: pickupLatLng, destinationLatLng: destinationLatLng,
         currentLatLng: currentLatLng, type: type, pickupAddress: pickupAddress,
         destinationAddress: destinationAddress,extraOneLatLng: extraOneLatLng,
         extraOne: extraOne,extraTwo: extraTwo,extraTwoLatLng: extraTwoLatLng,
-        rideRequestType: rideRequestType, scheduledAt: scheduledAt
+        rideRequestType: rideRequestType, scheduledAt: scheduledAt, extra: extra,
     );
   }
 
@@ -93,7 +93,8 @@ class RideService implements RideServiceInterface{
     String? receiverName, String? receiverPhone, String? receiverAddress, String? parcelCategoryId, String? weight, String? payer,
     double? returnFee, double? cancellationFee, String? zoneId,
     required String? scheduledAt,
-    String? rideRequestType, double? surgeMultiplier, String? pickupNote, bool? isFemaleDriverRequired
+    String? rideRequestType, double? surgeMultiplier, String? pickupNote, bool? isFemaleDriverRequired,
+    Map<String, dynamic>? extra,
   }) async{
     return await rideRepositoryInterface.submitRideRequest(
         pickupLat: pickupLat, pickupLng: pickupLng, destinationLat: destinationLat, bid: bid,
@@ -109,6 +110,7 @@ class RideService implements RideServiceInterface{
       scheduledAt: scheduledAt, senderAddress: senderAddress, senderName: senderName, senderPhone: senderPhone,
       receiverAddress: receiverAddress, receiverName: receiverName, receiverPhone: receiverPhone, rideRequestType: rideRequestType,
       surgeMultiplier: surgeMultiplier, pickupNote: pickupNote, isFemaleDriverRequired: isFemaleDriverRequired,
+      extra: extra,
     );
   }
 
@@ -118,8 +120,8 @@ class RideService implements RideServiceInterface{
   }
 
   @override
-  Future tripStatusUpdate(String id, String status, String cancellationCause) async{
-    return await rideRepositoryInterface.tripStatusUpdate(id, status, cancellationCause);
+  Future tripStatusUpdate(String id, String status, String cancellationCause, {List<String>? identityMismatchReason}) async{
+    return await rideRepositoryInterface.tripStatusUpdate(id, status, cancellationCause, identityMismatchReason: identityMismatchReason );
   }
 
   @override

@@ -1,9 +1,16 @@
+import 'package:flutter/services.dart';
+import 'package:ride_sharing_user_app/features/assistant/domain/models/assistant_models.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:ride_sharing_user_app/common_widgets/trip_arrival_card.dart';
+import 'package:ride_sharing_user_app/features/message/controllers/chat_inbox_controller.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:just_the_tooltip/just_the_tooltip.dart';
 import 'package:ride_sharing_user_app/data/api_checker.dart';
+import 'package:ride_sharing_user_app/features/dashboard/controllers/bottom_menu_controller.dart';
 import 'package:ride_sharing_user_app/features/map/screens/map_screen.dart';
 import 'package:ride_sharing_user_app/features/parcel/domain/models/parcel_estimated_fare_model.dart';
 import 'package:ride_sharing_user_app/features/refund_request/controllers/refund_request_controller.dart';
@@ -18,6 +25,8 @@ import 'package:ride_sharing_user_app/features/ride/domain/services/ride_service
 import 'package:ride_sharing_user_app/features/safety_setup/controllers/safety_alert_controller.dart';
 import 'package:ride_sharing_user_app/features/trip/controllers/trip_controller.dart';
 import 'package:ride_sharing_user_app/helper/display_helper.dart';
+import 'package:ride_sharing_user_app/helper/live_trip_notification_helper.dart';
+import 'package:ride_sharing_user_app/helper/notification_helper.dart';
 import 'package:ride_sharing_user_app/helper/pusher_helper.dart';
 import 'package:ride_sharing_user_app/helper/ride_controller_helper.dart';
 import 'package:ride_sharing_user_app/features/auth/controllers/auth_controller.dart';
@@ -26,6 +35,7 @@ import 'package:ride_sharing_user_app/features/address/domain/models/address_mod
 import 'package:ride_sharing_user_app/features/location/controllers/location_controller.dart';
 import 'package:ride_sharing_user_app/features/map/controllers/map_controller.dart';
 import 'package:ride_sharing_user_app/features/parcel/controllers/parcel_controller.dart';
+import 'package:ride_sharing_user_app/features/market/controllers/market_chat_controller.dart';
 import 'package:ride_sharing_user_app/features/payment/controllers/payment_controller.dart';
 import 'package:ride_sharing_user_app/util/app_constants.dart';
 
@@ -38,7 +48,14 @@ class RideController extends GetxController implements GetxService {
   RideController({required this.rideServiceInterface});
 
   RideState currentRideState = RideState.initial;
-  TripDetails? tripDetails;
+  TripDetails? _tripDetails;
+  TripDetails? get tripDetails => _tripDetails;
+  set tripDetails(TripDetails? value) {
+    _tripDetails = value;
+    if(value == null) {
+      LiveTripNotificationHelper.dispose();
+    }
+  }
   TripDetails? rideDetails;
   double currentFarePrice = 0;
   int rideCategoryIndex = 0;
@@ -67,18 +84,68 @@ class RideController extends GetxController implements GetxService {
   RideType _rideType = RideType.regularRide;
   String _pickupNote = '';
   String get pickupNoteText => _pickupNote;
+
+  /// The voice note for the driver (where to find the customer), sent with the booking.
+  VoiceTripResult? voiceNote;
+  /// The customer was asked once, this booking, how the driver finds them.
+  bool pickupHelpAsked = false;
+  /// Something tells the driver where to find the customer.
+  bool get hasPickupHelp => _pickupNote.isNotEmpty || voiceNote != null;
+
+  void setVoiceNote(VoiceTripResult? note) {
+    voiceNote = note;
+    update();
+  }
+
+  /// The words from a voice note become the written pickup note, unless one was written.
+  void usePickupText(String text) {
+    if (text.trim().isEmpty || _pickupNote.isNotEmpty || pickupNoteController.text.trim().isNotEmpty) return;
+    final String t = text.trim();
+    pickupNoteController.text = t.length > 200 ? t.substring(0, 200) : t;
+    _pickupNote = pickupNoteController.text;
+    update();
+  }
   RideType get rideType => _rideType;
   String? scheduleTripDate;
   DateTime? scheduleTripTime;
   RideListModel? runningRideList;
   bool isInitialWidgetRoutesExpand = false;
+  bool showIdentityMismatchOptions = false;
+  List<String> identityMismatchReasons = [];
 
   TripDetails? get currentTripDetails => tripDetails;
+
+  bool isShowDriverArrivalTooltip = false;
+  bool isShowDriverVerificationTooltip = false;
 
   TextEditingController inputFarePriceController = TextEditingController(text: '0.00');
   TextEditingController noteController = TextEditingController();
   final TextEditingController pickupNoteController = TextEditingController();
   bool isFemaleDriverSelected = false;
+
+  /// E-Ride Move booking in progress: the vehicle list is the trucks, the
+  /// only amount is the deposit, and the price is agreed with the driver.
+  /// Set by the entry point before the trip exists; once it does,
+  /// TripDetails.isMove is what counts.
+  bool isMove = false;
+  void setMoveMode(bool value) {
+    isMove = value;
+    rideCategoryIndex = 0;
+    fareList = [];
+    if (value) noteController.clear();
+  }
+
+  /// Health ride booking in progress: an urgent ride to care. The server gives
+  /// the normal fare with no surge, and there is no bidding. Set by the entry
+  /// point; once the trip exists, TripDetails.isHealthRide is what counts.
+  bool isHealthRide = false;
+  void setHealthMode(bool value) {
+    isHealthRide = value;
+    if (value) {
+      rideCategoryIndex = 0;
+      fareList = [];
+    }
+  }
 
   void initData() {
     currentRideState = RideState.initial;
@@ -89,6 +156,8 @@ class RideController extends GetxController implements GetxService {
     scheduleTripDate = null;
     scheduleTripTime = null;
     _pickupNote = '';
+    voiceNote = null;
+    pickupHelpAsked = false;
     pickupNoteController.clear();
     isFemaleDriverSelected = false;
   }
@@ -111,8 +180,10 @@ class RideController extends GetxController implements GetxService {
   String selectedCategoryId = '';
   FareModel? selectedType;
   void setRideCategoryIndex(int newIndex){
+    final categories = Get.find<CategoryController>().listFor(isMove);
+    if (categories == null || newIndex >= categories.length) return;
     rideCategoryIndex = newIndex;
-    categoryName = Get.find<CategoryController>().categoryList![rideCategoryIndex].id!;
+    categoryName = categories[rideCategoryIndex].id!;
 
     Get.find<CategoryController>().setCouponFilterIndex(newIndex + 2);
 
@@ -127,14 +198,14 @@ class RideController extends GetxController implements GetxService {
       estimatedDistance = selectedType!.estimatedDistance!;
       estimatedDuration = selectedType!.estimatedDuration!;
       selectedCategoryId = selectedType!.vehicleCategoryId!;
-      //
+      encodedPolyLine = selectedType!.polyline!;
       estimatedFare = (((selectedType?.extraFareFee ?? 0) > 0) || ((selectedType?.surgeMultiplier ?? 0) >0)) ? selectedType?.extraEstimatedFare ?? 0 : selectedType?.estimatedFare ?? 0;
       currentFarePrice = estimatedFare;
       actualFare = estimatedFare;
       isCouponApplicable = selectedType!.couponApplicable!;
       discountFare = (((selectedType?.extraFareFee ?? 0) > 0) || ((selectedType?.surgeMultiplier ?? 0) >0)) ? selectedType?.extraDiscountFare ?? 0 : selectedType?.discountFare ?? 0;
       discountAmount = (((selectedType?.extraFareFee ?? 0) > 0) || ((selectedType?.surgeMultiplier ?? 0) >0)) ? selectedType?.extraDiscountAmount ?? 0 : selectedType?.discountAmount ?? 0;
-
+      Get.find<MapController>().getPolyline();
     }
 
     update();
@@ -150,6 +221,14 @@ class RideController extends GetxController implements GetxService {
     tripDetails = null;
     rideDetails = null;
     update();
+  }
+
+  /// Puts a live trip back after another trip's details were shown in its place.
+  void restoreTripDetails(TripDetails trip) {
+    tripDetails = trip;
+    update();
+    // The 10 s timer stopped when the other trip emptied tripDetails while loading.
+    getRideDetails(trip.id!).then((_) => startLocationRecord());
   }
 
   @override
@@ -198,6 +277,7 @@ class RideController extends GetxController implements GetxService {
       parcelWeight: Get.find<ParcelController>().parcelWeightController.text,
       parcelCategoryId: parcel ? parcelController.parcelCategoryList![parcelController.selectedParcelCategory].id : '',
       scheduledAt: _rideType == RideType.scheduleRide ? scheduledTime.toString() : '',
+      extra: (isMove && !parcel) ? {'service': 'move'} : (isHealthRide && !parcel) ? {'health_ride': 1} : null,
     );
 
     if(response!.statusCode == 200) {
@@ -215,15 +295,19 @@ class RideController extends GetxController implements GetxService {
         if(fareList[rideCategoryIndex].polyline == null){
           showCustomSnackBar('road_not_found'.tr,isError: true);
         }
-        encodedPolyLine = fareList[rideCategoryIndex].polyline!;
+
       }
     }else{
       loading = false;
       isEstimate = false;
-      ApiChecker.checkApi(response);
-      if(response.statusCode == 403 && !parcel) {
-        tripDetails = null;
-        rideDetails = null;
+      if (!parcel && isIncompleteRide(response)) {
+        openExistingRide();
+      } else {
+        ApiChecker.checkApi(response);
+        if(response.statusCode == 403 && !parcel) {
+          tripDetails = null;
+          rideDetails = null;
+        }
       }
     }
 
@@ -231,7 +315,11 @@ class RideController extends GetxController implements GetxService {
     return response;
   }
 
-  Future<Response> submitRideRequest(String note, bool parcel, {String categoryId = ''}) async {
+  Future<Response> submitRideRequest(String note, bool parcel, {String categoryId = '', List<String>? movePhotos}) async {
+    // A second tap while the first booking is on its way: ignored (callers act on 200 only).
+    if (isSubmit) return const Response(statusCode: 429, statusText: 'already_sending');
+    final bool move = isMove && !parcel;
+    final bool health = isHealthRide && !parcel && !move && tripDetails == null;
     initCountingTimeStates();
     isSubmit = true;
     update();
@@ -262,9 +350,10 @@ class RideController extends GetxController implements GetxService {
       estimatedTime: parcel ? parcelEstimatedFare!.data!.estimatedDuration!.replaceFirst('min', '') : estimatedDuration,
       estimatedFare: parcel ? parcelFare : estimatedFare.toString(),
       actualFare: parcel ? parcelFare : estimatedFare != actualFare ? actualFare.toString() : estimatedFare.toString(),
-      bid:parcel ? false : estimatedFare != actualFare,
+      bid:(parcel || move || health) ? false : estimatedFare != actualFare,
       note: note,
-      paymentMethod: Get.find<PaymentController>().paymentTypeList[Get.find<PaymentController>().paymentTypeIndex],
+      // A move is paid to the driver in person; nothing is charged in the app.
+      paymentMethod: move ? 'cash' : Get.find<PaymentController>().offeredPaymentType,
       encodedPolyline: parcel ? encodedPolyLine : fareList.isNotEmpty ? fareList[rideCategoryIndex].polyline! : '',
       middleAddress: [locController.extraRouteAddress?.address ?? '', locController.extraRouteTwoAddress?.address ?? ''],
       entrance: locController.entranceController.text.toString(),
@@ -299,13 +388,24 @@ class RideController extends GetxController implements GetxService {
       surgeMultiplier: parcel ? parcelEstimatedFare?.data?.surgeMultiplier : selectedType?.surgeMultiplier,
       pickupNote: _pickupNote,
       isFemaleDriverRequired : parcel ? null : isFemaleDriverSelected,
+      extra: {
+        if (move) 'move_photos': jsonEncode(movePhotos ?? const []),
+        if (health) 'health_ride': 1,
+        // The customer's voice note for the driver.
+        if (voiceNote != null && (parcel || tripDetails == null)) 'voice_note': voiceNote!.name,
+      },
     );
 
     if(response.statusCode == 200 && response.body['data'] != null) {
       biddingList = [];
       tripDetails = TripDetailsModel.fromJson(response.body).data!;
       tripDetails!.id = response.body['data']['id'];
-      encodedPolyLine = tripDetails!.encodedPolyline!;
+      if (parcel && Get.isRegistered<MarketChatController>()) {
+        // A delivery booked from an E-Ride Market chat is posted back into that chat.
+        Get.find<MarketChatController>().onParcelBooked('${tripDetails!.id}', destinationPosition.latitude, destinationPosition.longitude);
+      }
+      if (parcel) Get.find<ParcelController>().lockedPayReceiver = null;
+      encodedPolyLine = tripDetails!.encodedPolyline ?? ''; // a trip can have no route line
       if(encodedPolyLine != '' && encodedPolyLine.isNotEmpty) {
 
       //  Get.find<MapController>().getPolyline();
@@ -322,12 +422,18 @@ class RideController extends GetxController implements GetxService {
       noteController.clear();
       pickupNoteController.clear();
       _pickupNote = '';
+      voiceNote = null;
+      pickupHelpAsked = false;
     }else{
       isSubmit = false;
-      ApiChecker.checkApi(response);
-      if(response.statusCode == 403) {
-        tripDetails = null;
-        rideDetails = null;
+      if (!parcel && isIncompleteRide(response)) {
+        openExistingRide();
+      } else {
+        ApiChecker.checkApi(response);
+        if(response.statusCode == 403) {
+          tripDetails = null;
+          rideDetails = null;
+        }
       }
     }
     actualFare = 0;
@@ -346,7 +452,9 @@ class RideController extends GetxController implements GetxService {
 
   Future<Response> getRideDetails(String tripId,{bool isUpdate = true}) async {
     isLoading = true;
-    tripDetails = null;
+    // A refresh of the same trip keeps it while it loads, and if the load fails
+    // (timeout, 429): clearing it stopped the location timer and blanked the trip.
+    if (tripDetails?.id != tripId) tripDetails = null;
     _thumbnailPaths = null;
     if(isUpdate){
       update();
@@ -356,10 +464,12 @@ class RideController extends GetxController implements GetxService {
     if (response.statusCode == 200) {
       Get.find<MapController>().notifyMapController();
       tripDetails = TripDetailsModel.fromJson(response.body).data!;
+      // Keep the trip chat live (and its unread badge) while a driver is assigned.
+      Get.find<ChatInboxController>().syncTrip(tripDetails!.id, tripDetails!.currentStatus);
       estimatedDistance = tripDetails!.estimatedDistance!.toString();
       isLoading = false;
 
-      encodedPolyLine = tripDetails!.encodedPolyline!;
+      encodedPolyLine = tripDetails!.encodedPolyline ?? ''; // a trip can have no route line
       List<Attachments> attachments = tripDetails?.parcelRefund?.attachments ?? [];
       _thumbnailPaths = List.filled(attachments.length, '');
 
@@ -381,6 +491,45 @@ class RideController extends GetxController implements GetxService {
 
   bool runningTrip = false;
 
+  /// The server's "Please complete previous ride first".
+  static bool isIncompleteRide(Response response) =>
+      response.statusCode == 403 && response.body is Map && response.body['response_code'] == 'incomplete_ride_403';
+
+  bool _openingExisting = false;
+
+  /// The customer already has a ride going (booked twice, or the app lost the
+  /// screen): open that ride where it stands instead of showing an error.
+  Future<void> openExistingRide() async {
+    if (_openingExisting) return;
+    _openingExisting = true;
+    try {
+      await getCurrentRegularRide();
+      final String? id = rideDetails?.id;
+      if (id == null) {
+        showCustomSnackBar('please_complete_previous_ride_first'.tr);
+        return;
+      }
+      showCustomSnackBar('you_already_have_a_ride'.tr, isError: false);
+      final String? status = rideDetails!.currentStatus;
+      if (status == AppConstants.pending || status == AppConstants.accepted || status == AppConstants.outForPickup) {
+        await getRideDetails(id, isUpdate: false);
+        PusherHelper().pusherDriverStatus(id);
+        if (status == AppConstants.pending) {
+          Get.find<AuthController>().saveFindingRideCreatedTime();
+          updateRideCurrentState(RideState.findingRider);
+        } else {
+          updateRideCurrentState(RideState.outForPickup);
+        }
+        Get.offAll(() => const MapScreen(fromScreen: MapScreenType.splash));
+      } else {
+        // On the trip, or finished and not paid yet: the usual routing.
+        NotificationHelper.notificationToRouteNavigate(id, false);
+      }
+    } finally {
+      _openingExisting = false;
+    }
+  }
+
   Future<Response> getCurrentRegularRide() async {
     Response response = await rideServiceInterface.getCurrentRegularRide();
     if (response.statusCode == 200 && response.body['data'] != null) {
@@ -396,8 +545,10 @@ class RideController extends GetxController implements GetxService {
 
   Future<Response> remainingDistance(String requestID,{bool mapBound = false}) async {
     isLoading = true;
+
     Response response = await rideServiceInterface.remainDistance(requestID);
-    if (response.statusCode == 200) {
+    // No road route: nothing to draw or measure this time (the next check comes in a few seconds).
+    if (response.statusCode == 200 && response.body is List && (response.body as List).isNotEmpty) {
       Get.find<MapController>().getDriverToPickupOrDestinationPolyline(response.body[0]["encoded_polyline"],mapBound: mapBound);
       remainingDistanceModel = [];
       for(var distance in response.body) {
@@ -410,10 +561,15 @@ class RideController extends GetxController implements GetxService {
       if(Get.find<MapController>().isInside && Get.find<ParcelController>().currentParcelState == ParcelDeliveryState.acceptRider){
         Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.otpSent);
       }
+
+      if(tripDetails != null && remainingDistanceModel.isNotEmpty) {
+        LiveTripNotificationHelper.showOrUpdate(trip: tripDetails!, distance: remainingDistanceModel[0]);
+      }
+      _announceArrivalStage();
+
       isLoading = false;
     }else{
       isLoading = false;
-      ApiChecker.checkApi(response);
     }
     update();
     return response;
@@ -475,6 +631,33 @@ class RideController extends GetxController implements GetxService {
   }
 
   Timer? _timer;
+  TripArrivalStage _arrivalStage = TripArrivalStage.enRoute;
+  String? _arrivalTripId;
+  AudioPlayer? _arrivalPlayer;
+
+  /// A buzz and a soft sound when the trip becomes "almost there" and again
+  /// at "arrived", once each per trip.
+  void _announceArrivalStage() {
+    if (tripDetails?.currentStatus != AppConstants.ongoing || remainingDistanceModel.isEmpty) return;
+    if (_arrivalTripId != tripDetails!.id) {
+      _arrivalTripId = tripDetails!.id;
+      _arrivalStage = TripArrivalStage.enRoute;
+    }
+    final TripArrivalStage stage = TripArrivalCard.stageFor(remainingDistanceModel[0].distance);
+    if (stage.index > _arrivalStage.index) {
+      HapticFeedback.heavyImpact();
+      try {
+        (_arrivalPlayer ??= AudioPlayer()).play(AssetSource('sound/chat_pop.wav'));
+      } catch (_) {}
+      _arrivalStage = stage;
+    }
+  }
+
+  /// The trip the 10 s timer follows. Another trip opened from the activity list
+  /// borrows tripDetails for a while: the timer waits instead of polling that one.
+  String? _recordTripId;
+  int _recordTick = 0;
+
   void startLocationRecord() {
     ///For First time call next call every 10 seconds.......
     if(Get.find<RideController>().tripDetails != null && Get.find<AuthController>().getUserToken() != ''){
@@ -482,13 +665,20 @@ class RideController extends GetxController implements GetxService {
     }else{
       _timer?.cancel();
     }
+    _recordTripId = tripDetails?.id;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if(Get.find<RideController>().tripDetails != null && Get.find<AuthController>().getUserToken() != '' ){
+        if (tripDetails?.id != _recordTripId) return;
+        // In the background only every 30 s: enough for the trip notification.
+        _recordTick++;
+        if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed && _recordTick % 3 != 0) return;
         if(Get.find<RideController>().tripDetails?.type == AppConstants.parcel && (Get.find<RideController>().tripDetails?.currentStatus == AppConstants.accepted || Get.find<RideController>().tripDetails?.currentStatus == AppConstants.ongoing)){
           Get.find<RideController>().remainingDistance(Get.find<RideController>().tripDetails!.id!);
 
-        }else if(Get.find<RideController>().tripDetails?.type == 'ride_request' && (Get.find<RideController>().tripDetails?.currentStatus == AppConstants.outForPickup || Get.find<RideController>().tripDetails?.currentStatus == AppConstants.ongoing)){
+        // Any ride, scheduled ones too (their type is scheduled_request): the driver's
+        // position and arrival time on the map came only for regular rides.
+        }else if(Get.find<RideController>().tripDetails?.type != AppConstants.parcel && (Get.find<RideController>().tripDetails?.currentStatus == AppConstants.outForPickup || Get.find<RideController>().tripDetails?.currentStatus == AppConstants.ongoing)){
           Get.find<RideController>().remainingDistance(Get.find<RideController>().tripDetails!.id!);
 
         }
@@ -538,12 +728,50 @@ class RideController extends GetxController implements GetxService {
   void clearBiddingList(){
     biddingList = [];
     update();
-}
+  }
 
-  Future<Response> tripStatusUpdate(String tripId, String status, String message, String cancellationCause, {bool afterAccept = false}) async {
+  void toggleIdentityMismatchView(bool isShow){
+    showIdentityMismatchOptions = isShow;
+    identityMismatchReasons = [];
+    update();
+  }
+
+  void toggleShowDriverNearByTooltip(bool action){
+    isShowDriverArrivalTooltip = action;
+    update();
+  }
+
+  void toggleShowDriverVerificationTooltip(bool action){
+    isShowDriverVerificationTooltip = action;
+    update();
+  }
+
+  void toggleIdentityMismatchReason(String reason){
+    if(identityMismatchReasons.contains(reason)){
+      identityMismatchReasons.remove(reason);
+    }else{
+      identityMismatchReasons.add(reason);
+    }
+    update();
+  }
+
+  Future<void> submitIdentityMismatchAndCancelTrip() async {
+    Response response = await tripStatusUpdate(
+      tripDetails!.id!, 'cancelled', 'ride_request_cancelled_successfully',
+      '', identityMismatchReason: identityMismatchReasons
+    );
+    if(response.statusCode == 200){
+      showIdentityMismatchOptions = false;
+      identityMismatchReasons = [];
+      Get.back();
+      Get.find<BottomMenuController>().navigateToDashboard();
+    }
+  }
+
+  Future<Response> tripStatusUpdate(String tripId, String status, String message, String cancellationCause, {List<String>? identityMismatchReason,  bool afterAccept = false}) async {
     isLoading = true;
     update();
-    Response response = await rideServiceInterface.tripStatusUpdate(tripId, status, cancellationCause);
+    Response response = await rideServiceInterface.tripStatusUpdate(tripId, status, cancellationCause, identityMismatchReason: identityMismatchReason);
     if (response.statusCode == 200) {
       Get.find<TripController>().othersCancellationController.clear();
       Get.find<SafetyAlertController>().cancelDriverNeedSafetyStream();
@@ -738,6 +966,11 @@ class RideController extends GetxController implements GetxService {
       isLoading = false;
       if(response.body['data'] != null){
         runningRideList = RideListModel.fromJson(response.body);
+        // Home knows the running trip from this list without loading its
+        // details, so the trip chat (and its unread badge) starts here too.
+        for (final TripDetails trip in runningRideList?.data ?? const <TripDetails>[]) {
+          Get.find<ChatInboxController>().syncTrip(trip.id, trip.currentStatus);
+        }
       }
     }else{
       isLoading = false;

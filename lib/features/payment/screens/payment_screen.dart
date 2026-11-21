@@ -44,20 +44,33 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     if(Get.find<ProfileController>().profileModel?.data?.wallet == null){
       Get.find<ProfileController>().getProfileInfo();
     }
+    Get.find<PaymentController>().bookedWithCash = Get.find<RideController>().tripDetails?.paymentMethod == 'cash';
     Get.find<PaymentController>().initPayment();
     Get.find<PaymentController>().getPaymentGetWayList();
     Get.find<PaymentController>().setPaymentByName(Get.find<RideController>().tripDetails?.paymentMethod??'cash');
+    // Opened straight from the trip state (app reopened after the trip ended):
+    // the final fare may not be loaded yet, or be another trip's.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final rideController = Get.find<RideController>();
+      final tripId = rideController.tripDetails?.id;
+      if (tripId != null && rideController.finalFare?.id != tripId) {
+        rideController.getFinalFare(tripId);
+      }
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if(state == AppLifecycleState.resumed){
-      Get.find<RideController>().getRideDetails(Get.find<RideController>().currentTripDetails!.id!).then((value) {
+    // The trip can be briefly unloaded on resume; use the id we had.
+    final String? tripId = Get.find<RideController>().currentTripDetails?.id ?? Get.find<RideController>().finalFare?.id;
+    if(state == AppLifecycleState.resumed && tripId != null){
+      Get.find<RideController>().getRideDetails(tripId).then((value) {
         if(Get.find<RideController>().currentTripDetails?.paymentStatus == 'paid'){
           Get.offAll(()=> const DashboardScreen());
         }else{
-          Get.find<RideController>().getFinalFare(Get.find<RideController>().currentTripDetails!.id!);
+          Get.find<RideController>().getFinalFare(tripId);
+          Get.find<PaymentController>().bookedWithCash = Get.find<RideController>().tripDetails?.paymentMethod == 'cash';
           Get.find<PaymentController>().initPayment();
           Get.find<PaymentController>().getPaymentGetWayList();
           Get.find<PaymentController>().setPaymentByName(Get.find<RideController>().tripDetails?.paymentMethod??'cash');
@@ -69,6 +82,8 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // A new booking only offers what the admin allows.
+    Get.find<PaymentController>().bookedWithCash = false;
     super.dispose();
   }
 
@@ -159,7 +174,9 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                           child: Row(mainAxisAlignment: MainAxisAlignment.center,children: [
                               Text(
                                 PriceConverter.convertPrice(
-                                  rideController.finalFare!.paidFare! + double.parse(paymentController.tipAmount),
+                                  // What is left once the booking deposit counts toward it.
+                                  rideController.finalFare!.paidFare! + double.parse(paymentController.tipAmount)
+                                    - rideController.finalFare!.depositCredit(rideController.finalFare!.paidFare! + double.parse(paymentController.tipAmount)),
                                 ),
                                 style: textRobotoMedium.copyWith(fontSize: Dimensions.fontSizeOverLarge,
                                   color: Theme.of(context).textTheme.bodyMedium!.color,
@@ -195,11 +212,13 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                           Expanded(child: ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: paymentController.paymentTypeList.length,
+                            // Only the ways the admin offers; each keeps its place in the full list.
+                            itemCount: paymentController.shownPaymentTypes.length,
                             itemBuilder: (context, index){
+                              final String type = paymentController.shownPaymentTypes[index];
                               return PaymentTypeItem(
-                                title: paymentController.paymentTypeList[index],
-                                index: index,
+                                title: type,
+                                index: paymentController.paymentTypeList.indexOf(type),
                                 selectedIndex: paymentController.paymentTypeIndex,
                               );
                             },
@@ -307,7 +326,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                             child: ExpansionTile(initiallyExpanded: true,
                               tilePadding:collapsed ? EdgeInsets.zero :
                               const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
-                              collapsedBackgroundColor: Theme.of(context).primaryColor.withValues(alpha:.4),
+                              collapsedBackgroundColor: Theme.of(context).cardColor,
                               collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               title: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -327,15 +346,14 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                               children: [
                                 const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                                if(rideController.tripDetails != null)
-                                  RouteWidget(
-                                    totalDistance: rideController.finalFare?.actualDistance?.toString()??'0',
-                                    fromAddress: rideController.tripDetails!.pickupAddress!,
-                                    toAddress: rideController.tripDetails!.destinationAddress!,
-                                    extraOneAddress: firstRoute,
-                                    extraTwoAddress: secondRoute,
-                                    entrance:  rideController.tripDetails!.entrance ?? '',
-                                  ),
+                                RouteWidget(
+                                  totalDistance: rideController.finalFare?.actualDistance?.toString()??'0',
+                                  fromAddress: rideController.tripDetails?.pickupAddress ?? rideController.finalFare?.pickupAddress ?? '',
+                                  toAddress: rideController.tripDetails?.destinationAddress ?? rideController.finalFare?.destinationAddress ?? '',
+                                  extraOneAddress: firstRoute,
+                                  extraTwoAddress: secondRoute,
+                                  entrance:  rideController.tripDetails?.entrance ?? rideController.finalFare?.entrance ?? '',
+                                ),
                               ],
                             ),
                           ),
@@ -344,15 +362,18 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
                     }),
 
-                    Get.find<RideController>().finalFare != null ? Column(children: [
-                      TripFareSummery(fromPayment: true,
-                          tripFare: Get.find<RideController>().finalFare!.paidFare!,
-                          fromParcel: widget.fromParcel,
-                      ),
+                    // Its own builder: the final fare can arrive after this screen opens.
+                    GetBuilder<RideController>(builder: (rideController) {
+                      return rideController.finalFare != null ? Column(children: [
+                        TripFareSummery(fromPayment: true,
+                            tripFare: rideController.finalFare!.paidFare!,
+                            fromParcel: widget.fromParcel,
+                        ),
 
-                      ApplyCoupon(tripId: Get.find<RideController>().finalFare!.id!),
+                        ApplyCoupon(tripId: rideController.finalFare!.id!),
 
-                    ]) : const SizedBox(),
+                      ]) : const SizedBox();
+                    }),
 
                   ]));
                 }),

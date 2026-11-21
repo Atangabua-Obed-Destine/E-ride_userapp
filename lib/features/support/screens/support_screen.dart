@@ -5,7 +5,6 @@ import 'package:ride_sharing_user_app/features/dashboard/screens/dashboard_scree
 import 'package:ride_sharing_user_app/features/support/controllers/help_support_controller.dart';
 import 'package:ride_sharing_user_app/features/support/widgets/contact_us_view.dart';
 import 'package:ride_sharing_user_app/features/support/widgets/help_support_type_button_widget.dart';
-import 'package:ride_sharing_user_app/helper/responsive_helper.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
@@ -81,7 +80,7 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                   ]),
               ),
 
-              Positioned(top: Get.height * (GetPlatform.isIOS ? ResponsiveHelper.isTab ? 0.08 : 0.15 :  0.11), left: Dimensions.paddingSizeSmall,
+              Positioned(top: AppBarWidget.overlayTop(context), left: Dimensions.paddingSizeSmall,
                 child: SizedBox(height: Get.find<LocalizationController>().isLtr? 45 : 50,
                   width: Get.width-Dimensions.paddingSizeDefault,
                   child: ListView.builder(

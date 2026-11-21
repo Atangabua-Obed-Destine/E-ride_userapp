@@ -1,10 +1,15 @@
+import 'package:ride_sharing_user_app/common_widgets/call_options_sheet.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/common_widgets/chat_kit.dart';
 import 'package:ride_sharing_user_app/common_widgets/custom_pop_scope_widget.dart';
+import 'package:ride_sharing_user_app/features/message/controllers/chat_inbox_controller.dart';
+import 'package:ride_sharing_user_app/features/message/domain/models/message_model.dart';
 import 'package:ride_sharing_user_app/features/message/widget/message_bubble.dart';
 import 'package:ride_sharing_user_app/features/profile/controllers/profile_controller.dart';
+import 'package:ride_sharing_user_app/features/ride/controllers/ride_controller.dart';
 import 'package:ride_sharing_user_app/helper/display_helper.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
@@ -12,10 +17,9 @@ import 'package:ride_sharing_user_app/util/images.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
 import 'package:ride_sharing_user_app/features/message/controllers/message_controller.dart';
 import 'package:ride_sharing_user_app/features/notification/widgets/notification_shimmer.dart';
-import 'package:ride_sharing_user_app/common_widgets/app_bar_widget.dart';
-import 'package:ride_sharing_user_app/common_widgets/body_widget.dart';
-import 'package:ride_sharing_user_app/common_widgets/no_data_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/paginated_list_widget.dart';
+import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
+import 'package:ride_sharing_user_app/features/store/controllers/store_controller.dart';
 import 'dart:math' as math;
 
 class MessageScreen extends StatefulWidget {
@@ -29,237 +33,458 @@ class MessageScreen extends StatefulWidget {
 }
 
 class _MessageScreenState extends State<MessageScreen> {
+  static const List<String> _rideReplyKeys = [
+    'qr_customer_at_pickup',
+    'qr_customer_coming',
+    'qr_customer_where',
+    'qr_customer_call_me',
+    'qr_customer_wait',
+  ];
+
+  /// A food delivery: the rider comes to the customer, not the other way round.
+  static const List<String> _foodReplyKeys = [
+    'qr_food_where',
+    'qr_food_coming_out',
+    'qr_food_meet_gate',
+    'qr_customer_call_me',
+    'qr_food_thanks',
+  ];
+
+  List<String> get _quickReplyKeys =>
+      Get.find<StoreController>().isStoreOrderTrip(widget.tripId) ? _foodReplyKeys : _rideReplyKeys;
+
+  final ScrollController scrollController = ScrollController();
+  late final ChatInboxController _inbox = Get.find<ChatInboxController>();
 
   @override
   void initState() {
-    _loadData();
     super.initState();
+    _inbox.chatOpened(channelId: widget.channelId, tripId: widget.tripId, peerName: widget.userName);
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _inbox.userStoppedTyping(widget.channelId);
+    _inbox.chatClosed(widget.channelId);
+    scrollController.dispose();
+    super.dispose();
   }
 
   Future _loadData() async {
     ///make sure to call before getConversation to show loading
     if(Get.find<ProfileController>().profileModel?.data?.id == null) {
       await Get.find<ProfileController>().getProfileInfo();
-
     }
     Get.find<MessageController>().findChannelRideStatus(widget.channelId);
     Get.find<MessageController>().getConversation(widget.channelId, 1);
     Get.find<MessageController>().subscribeMessageChannel(widget.tripId);
   }
 
+  /// The driver of this chat's trip, when that trip is the one loaded.
+  ({String name, String? image, String? phone, String? plate}) _peer(MessageController messageController) {
+    final trip = Get.find<RideController>().tripDetails;
+    final String? driverBase = Get.find<ConfigController>().config?.imageBaseUrl?.profileImageDriver;
+    if (trip != null && trip.id == widget.tripId && trip.driver != null) {
+      final driver = trip.driver!;
+      final String name = '${driver.firstName ?? ''} ${driver.lastName ?? ''}'.trim();
+      return (
+        name: name.isNotEmpty ? name : widget.userName,
+        image: (driver.profileImage ?? '').isNotEmpty ? '$driverBase/${driver.profileImage}' : null,
+        phone: driver.phone,
+        plate: trip.vehicle?.licencePlateNumber,
+      );
+    }
+    final String? me = Get.find<ProfileController>().profileModel?.data?.id;
+    final Message? fromPeer = messageController.messageModel?.data?.firstWhereOrNull((m) => m.user?.id != null && m.user?.id != me);
+    final String? image = fromPeer?.user?.profileImage;
+    return (
+      name: widget.userName,
+      image: (image ?? '').isNotEmpty ? '$driverBase/$image' : null,
+      phone: fromPeer?.user?.phone,
+      plate: null,
+    );
+  }
 
-  ScrollController scrollController = ScrollController();
+  void _send(MessageController messageController) {
+    if(messageController.conversationController.text.trim().isEmpty
+        && messageController.pickedImageFile!.isEmpty
+        && messageController.otherFile==null) {
+      showCustomSnackBar('write_something'.tr, isError: true);
+    } else if(messageController.conversationKey.currentState!.validate()) {
+      _inbox.userStoppedTyping(widget.channelId);
+      messageController.sendMessage(widget.channelId , widget.tripId);
+    }
+    messageController.conversationController.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: CustomPopScopeWidget(
-        child: Scaffold(
-          body: BodyWidget(
-            appBar: AppBarWidget(
-              title:"${'chat_with'.tr} ${widget.userName}", showBackButton: true, centerTitle: true,
-            ),
-            body:  GetBuilder<MessageController>(builder: (messageController) {
-              return Column(children: [
-                messageController.messageModel?.data != null ?
-                messageController.messageModel!.data!.isNotEmpty ?
-                Expanded(child: SingleChildScrollView(
-                  controller: scrollController,
+    final bool dark = Get.isDarkMode;
+    final Color canvas = dark ? const Color(0xFF121212) : const Color(0xFFF2F2F5);
+
+    return CustomPopScopeWidget(
+      child: Scaffold(
+        backgroundColor: canvas,
+        body: GetBuilder<MessageController>(builder: (messageController) {
+          final peer = _peer(messageController);
+          final bool open = messageController.channelRideStatus;
+          final List<Message>? messages = messageController.messageModel?.data;
+          final bool hasDraft = messageController.conversationController.text.trim().isNotEmpty
+              || (messageController.pickedImageFile?.isNotEmpty ?? false)
+              || messageController.otherFile != null;
+
+          return Column(children: [
+            GetBuilder<ChatInboxController>(builder: (inbox) => ChatHeader(
+              name: peer.name,
+              subtitle: open ? 'your_driver'.tr : 'trip_ended'.tr,
+              imageUrl: peer.image,
+              plate: open ? peer.plate : null,
+              online: open,
+              typing: inbox.peerTyping && inbox.openChannelId == widget.channelId,
+              onBack: () => Get.back(),
+              onCall: (open && (peer.phone ?? '').isNotEmpty) ? () => CallOptionsSheet.show(phone: peer.phone, name: peer.name) : null,
+            )),
+
+            Expanded(child: messages == null ?
+              const NotificationShimmer() :
+              messages.isEmpty ?
+              _EmptyChat(name: peer.name, imageUrl: peer.image) :
+              SingleChildScrollView(
+                controller: scrollController,
+                reverse: true,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: PaginatedListWidget(
                   reverse: true,
-                  child: PaginatedListWidget(
+                  scrollController: scrollController,
+                  totalSize: messageController.messageModel?.totalSize,
+                  offset: (messageController.messageModel != null && messageController.messageModel?.offset != null) ?
+                  int.parse(messageController.messageModel!.offset.toString()) : null,
+                  onPaginate: (int? offset) async {
+                    await messageController.getConversation(widget.channelId, offset!);
+                  },
+                  itemView: ListView.builder(
                     reverse: true,
-                    scrollController: scrollController,
-                    totalSize: messageController.messageModel?.totalSize,
-                    offset: (messageController.messageModel != null && messageController.messageModel?.offset != null) ?
-                    int.parse(messageController.messageModel!.offset.toString()) : null,
-                    onPaginate: (int? offset) async {
-                      await messageController.getConversation(widget.channelId, offset!);
-                    },
-                    itemView: ListView.builder(
-                      reverse: true,
-                      itemCount: messageController.messageModel?.data?.length,
-                      padding: const EdgeInsets.all(0),
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      itemBuilder: (BuildContext context, int index) {
-                        if(index != 0){
-                          return ConversationBubble(
-                            message: messageController.messageModel!.data![index],
-                            previousMessage: messageController.messageModel!.data![index-1],
-                            index: index,length: messageController.messageModel!.data!.length,
-                          );
-                        }else{
-                          return ConversationBubble(
-                            message: messageController.messageModel!.data![index],
-                            index: index,length: messageController.messageModel!.data!.length,
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                )) :
-                const Expanded(child: NoDataWidget(title: 'no_message_found')) :
-                const Expanded(child: NotificationShimmer()),
-
-                (messageController.pickedImageFile != null && messageController.pickedImageFile!.isNotEmpty) ?
-                Container(height: 90, width: Get.width,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: messageController.pickedImageFile!.length,
-                    itemBuilder: (context, index) {
-                      return  Stack(children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: SizedBox(height: 80, width: 80, child: Image.file(
-                              File(messageController.pickedImageFile![index].path),
-                              fit: BoxFit.cover,
-                            )),
-                          ),
-                        ),
-                        Positioned(right: 5, child: InkWell(
-                          onTap: () => messageController.pickMultipleImage(true,index: index),
-                          child: const Icon(Icons.cancel_outlined, color: Colors.red),
-                        )),
-                      ]);
+                    itemCount: messages.length,
+                    padding: const EdgeInsets.all(0),
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    itemBuilder: (BuildContext context, int index) {
+                      final Message message = messages[index];
+                      return ConversationBubble(
+                        key: ValueKey<Object>(message.id ?? message),
+                        message: message,
+                        previousMessage: index != 0 ? messages[index-1] : null,
+                        index: index,
+                        length: messages.length,
+                        onRetry: message.isFailed ? () => messageController.retryMessage(message, widget.channelId, widget.tripId) : null,
+                      );
                     },
                   ),
-                ) :
-                const SizedBox(),
+                ),
+              ),
+            ),
 
-                messageController.otherFile != null ?
-                Stack(children: [
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 25),
-                    height: 25, child: Text(messageController.otherFile!.names.toString()),),
+            GetBuilder<ChatInboxController>(builder: (inbox) => AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              child: (inbox.peerTyping && inbox.openChannelId == widget.channelId) ? const TypingBubble() : const SizedBox(width: double.infinity),
+            )),
 
-                  Positioned(top: 0, right: 0,
-                    child: InkWell(
-                      onTap: () => messageController.pickOtherFile(true),
-                      child: const Icon(Icons.cancel_outlined, color: Colors.red),
-                    ),
-                  ),
-                ]) :
-                const SizedBox(),
-
-                ///Message send field here.
-
-                const SizedBox(height: 20),
-                messageController.channelRideStatus ?
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Expanded(child: Container(
-                    margin: const EdgeInsets.only(
-                      left: Dimensions.paddingSizeSmall,
-                      right: Dimensions.paddingSizeSmall,
-                      bottom: Dimensions.paddingSizeSmall,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).primaryColor),
-                      color: Theme.of(context).cardColor,
-                      borderRadius: const BorderRadius.all(Radius.circular(100)),
-                    ),
-                    child: Form(
-                      key: messageController.conversationKey,
-                      child: Row(children: [
-                        const SizedBox(width: Dimensions.paddingSizeDefault),
-
-                        Expanded(child: TextField(
-                          minLines: 1,
-                          controller: messageController.conversationController,
-                          textCapitalization: TextCapitalization.sentences,
-                          style: textMedium.copyWith(
-                            fontSize: Dimensions.fontSizeLarge,
-                            color:Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.8),
-                          ),
-                          keyboardType: TextInputType.multiline,
-                          maxLines: 2,
-                          cursorColor: Theme.of(context).primaryColor,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            hintText: "type_here".tr,
-                            hintStyle: textRegular.copyWith(
-                              color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.8),
-                              fontSize: 16,
-                            ),
-                          ),
-                          onChanged: (String newText) {},
+            (messageController.pickedImageFile != null && messageController.pickedImageFile!.isNotEmpty) ?
+            Container(height: 90, width: Get.width,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: messageController.pickedImageFile!.length,
+                itemBuilder: (context, index) {
+                  return  Stack(children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(height: 80, width: 80, child: Image.file(
+                          File(messageController.pickedImageFile![index].path),
+                          fit: BoxFit.cover,
                         )),
-
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
-                          child: InkWell(
-                            onTap: () => messageController.pickMultipleImage(false),
-                            child: Image.asset(
-                              Images.pickImage, color: Get.isDarkMode ? Colors.white : Colors.black,
-                            ),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  )),
-
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).primaryColor),
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: const BorderRadius.all(Radius.circular(50)),
-                    ),
-                    margin: EdgeInsets.only(
-                      bottom: Dimensions.paddingSizeDefault,
-                      right: Get.find<LocalizationController>().isLtr ? Dimensions.paddingSizeDefault : 0,
-                      left: Get.find<LocalizationController>().isLtr ? 0 : Dimensions.paddingSizeDefault,
-                    ),
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                    child: messageController.isSending ?
-                    SpinKitCircle(color: Theme.of(context).cardColor, size: 20) :
-                    messageController.isImagePicked ?
-                    SpinKitCircle(color: Theme.of(context).cardColor, size: 20) :
-                    InkWell(
-                      onTap: (){
-                        if(messageController.conversationController.text.trim().isEmpty
-                            && messageController.pickedImageFile!.isEmpty
-                            && messageController.otherFile==null) {
-                          showCustomSnackBar('write_something'.tr, isError: true);
-                        } else if(messageController.conversationKey.currentState!.validate()) {
-                          messageController.sendMessage(widget.channelId , widget.tripId).then((value) {
-                          });
-                        }
-                        messageController.conversationController.clear();
-                      },
-                      child: Transform(
-                        alignment: Alignment.center,
-                        transform: Get.find<LocalizationController>().isLtr ?
-                        Matrix4.rotationY(0) :
-                        Matrix4.rotationY(math.pi),
-                        child: Image.asset(
-                          Images.sendMessage,
-                          width: Dimensions.iconSizeMedium,
-                          height: Dimensions.iconSizeMedium,
-                          color: Theme.of(context).cardColor,
-                        ),
                       ),
                     ),
-                  )
-                ]) :
-                SizedBox(height: 50, child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha:0.75), borderRadius: BorderRadius.circular(5),
+                    Positioned(right: 5, child: InkWell(
+                      onTap: () => messageController.pickMultipleImage(true,index: index),
+                      child: const Icon(Icons.cancel_rounded, color: Colors.red),
+                    )),
+                  ]);
+                },
+              ),
+            ) :
+            const SizedBox(),
+
+            messageController.otherFile != null ?
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(children: [
+                const Icon(Icons.attach_file_rounded, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text(messageController.otherFile!.names.join(', '), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                InkWell(
+                  onTap: () => messageController.pickOtherFile(true),
+                  child: const Icon(Icons.cancel_rounded, color: Colors.red),
+                ),
+              ]),
+            ) :
+            const SizedBox(),
+
+            if (!open)
+              const SafeArea(top: false, child: ChatClosedBar())
+            else ...[
+              if (!hasDraft && !messageController.isRecording && !messageController.isSending)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: QuickReplies(
+                    replies: _quickReplyKeys.map((k) => k.tr).toList(),
+                    onTap: (text) => messageController.sendQuickReply(text, widget.channelId, widget.tripId),
                   ),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.block),
-                    const SizedBox(width: 5),
+                ),
+              SafeArea(
+                top: false,
+                child: ((Get.find<ConfigController>().config?.voiceChatIsEnable ?? false) && messageController.isRecording) ?
+                _VoiceRecordingRow(
+                  messageController: messageController,
+                  onCancel: () => messageController.cancelVoiceRecording(),
+                  onSend: () => messageController.stopAndSendVoiceRecording(widget.channelId, widget.tripId),
+                ) :
+                _Composer(
+                  messageController: messageController,
+                  onChanged: (text) {
+                    messageController.update();
+                    if (text.trim().isNotEmpty) _inbox.userTyping(widget.channelId);
+                  },
+                  onSend: () => _send(messageController),
+                ),
+              ),
+            ],
+          ]);
+        }),
+      ),
+    );
+  }
+}
 
-                    Flexible(child: Text("you_could't_replay_you_have_no_trip".tr)),
-                  ]),
-                )),
+/// Message box: photo button, text, and a send button that turns into a
+/// microphone when the box is empty (if voice messages are on).
+class _Composer extends StatelessWidget {
+  final MessageController messageController;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onSend;
+  const _Composer({required this.messageController, required this.onChanged, required this.onSend});
 
-              ]);
-            }),
+  @override
+  Widget build(BuildContext context) {
+    final bool dark = Get.isDarkMode;
+    final Color brand = Theme.of(context).primaryColor;
+    final bool voiceChatIsEnable = Get.find<ConfigController>().config?.voiceChatIsEnable ?? false;
+    final bool hasContent = messageController.conversationController.text.trim().isNotEmpty
+        || messageController.pickedImageFile!.isNotEmpty
+        || messageController.otherFile != null;
+    final bool showMicButton = voiceChatIsEnable && !hasContent;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(child: Container(
+          constraints: const BoxConstraints(minHeight: 50),
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF2C2C2E) : Colors.white,
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 3))],
+          ),
+          child: Form(
+            key: messageController.conversationKey,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              IconButton(
+                onPressed: () => messageController.pickMultipleImage(false),
+                tooltip: 'photo'.tr,
+                icon: Image.asset(Images.pickImage, width: 22, height: 22, color: Theme.of(context).hintColor),
+              ),
+              Expanded(child: TextField(
+                minLines: 1,
+                maxLines: 4,
+                controller: messageController.conversationController,
+                textCapitalization: TextCapitalization.sentences,
+                style: textMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: dark ? Colors.white : const Color(0xFF1C1C1E)),
+                keyboardType: TextInputType.multiline,
+                cursorColor: brand,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  hintText: 'type_a_message'.tr,
+                  hintStyle: textRegular.copyWith(color: Theme.of(context).hintColor, fontSize: 16),
+                ),
+                onChanged: onChanged,
+              )),
+              const SizedBox(width: 12),
+            ]),
+          ),
+        )),
+        const SizedBox(width: 8),
+
+        Material(
+          color: brand,
+          shape: const CircleBorder(),
+          elevation: 0,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: (messageController.isSending || messageController.isImagePicked) ? null :
+              showMicButton ? () => messageController.startVoiceRecording() : onSend,
+            child: SizedBox(
+              width: 50,
+              height: 50,
+              child: Center(
+                child: (messageController.isSending || messageController.isImagePicked) ?
+                const SpinKitCircle(color: Colors.white, size: 22) :
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  transitionBuilder: (child, a) => ScaleTransition(scale: a, child: child),
+                  child: showMicButton ?
+                  Image.asset(Images.microphone, key: const ValueKey('mic'), width: 22, height: 22, color: Colors.white) :
+                  Transform(
+                    key: const ValueKey('send'),
+                    alignment: Alignment.center,
+                    transform: Get.find<LocalizationController>().isLtr ? Matrix4.rotationY(0) : Matrix4.rotationY(math.pi),
+                    child: Image.asset(Images.sendMessage, width: 22, height: 22, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
+      ]),
+    );
+  }
+}
+
+class _EmptyChat extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+  const _EmptyChat({required this.name, this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ChatAvatar(name: name, imageUrl: imageUrl, size: 76),
+          const SizedBox(height: 14),
+          Text('say_hello_to_driver'.tr, textAlign: TextAlign.center, style: textBold.copyWith(fontSize: Dimensions.fontSizeLarge)),
+          const SizedBox(height: 6),
+          Text(
+            'chat_privacy_note'.tr,
+            textAlign: TextAlign.center,
+            style: textRegular.copyWith(color: Theme.of(context).hintColor, fontSize: Dimensions.fontSizeSmall),
+          ),
+        ]),
       ),
+    );
+  }
+}
+
+class _VoiceRecordingRow extends StatelessWidget {
+  final MessageController messageController;
+  final VoidCallback onCancel;
+  final VoidCallback onSend;
+  const _VoiceRecordingRow({required this.messageController, required this.onCancel, required this.onSend});
+
+  String _formatDuration(Duration duration) {
+    final int minutes = duration.inMinutes;
+    final int seconds = duration.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color brand = Theme.of(context).primaryColor;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Row(children: [
+        IconButton(
+          onPressed: onCancel,
+          tooltip: 'delete'.tr,
+          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: Dimensions.iconSizeExtraLarge),
+        ),
+        Expanded(child: Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault),
+          decoration: BoxDecoration(
+            color: Get.isDarkMode ? const Color(0xFF2C2C2E) : Colors.white,
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: Row(children: [
+            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text(
+              _formatDuration(messageController.recordDuration),
+              style: textMedium.copyWith(color: brand, fontSize: Dimensions.fontSizeDefault),
+            ),
+            const SizedBox(width: Dimensions.paddingSizeSmall),
+            Expanded(child: _VoiceWaveform(amplitudes: messageController.voiceAmplitudes, color: brand)),
+          ]),
+        )),
+        const SizedBox(width: 8),
+        Material(
+          color: brand,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onSend,
+            child: SizedBox(
+              width: 50,
+              height: 50,
+              child: Center(child: Transform(
+                alignment: Alignment.center,
+                transform: Get.find<LocalizationController>().isLtr ? Matrix4.rotationY(0) : Matrix4.rotationY(math.pi),
+                child: Image.asset(Images.sendMessage, width: 22, height: 22, color: Colors.white),
+              )),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _VoiceWaveform extends StatelessWidget {
+  final List<double> amplitudes;
+  final Color color;
+  const _VoiceWaveform({required this.amplitudes, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 24,
+      width: double.infinity,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: amplitudes.isEmpty ?
+          List.generate(3, (index) => _bar(4)) :
+          amplitudes.map((amplitude) {
+            final double normalized = ((amplitude + 45) / 45).clamp(0.0, 1.0);
+            return _bar(4 + (normalized * 20));
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _bar(double height) {
+    return Container(
+      width: 3,
+      height: height,
+      margin: const EdgeInsets.symmetric(horizontal: 1.5),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
     );
   }
 }

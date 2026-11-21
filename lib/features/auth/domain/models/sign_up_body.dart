@@ -9,13 +9,15 @@ class SignUpBody {
   String? identificationType;
   String? identificationNumber;
   String? referralCode;
+  String? loginMedium;
 
 
 
   SignUpBody({
     this.fName, this.lName, this.phone, this.email,
     this.password, this.confirmPassword, this.referralCode,
-    this.address, this.identificationNumber, this.identificationType
+    this.address, this.identificationNumber, this.identificationType,
+    this.loginMedium
   });
 
   SignUpBody.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class SignUpBody {
     address = json['address'];
     identificationType = json['identification_type'];
     identificationNumber = json['identification_number'];
+    loginMedium = json['medium'];
 
   }
 
@@ -41,6 +44,7 @@ class SignUpBody {
     data['confirm_password'] = confirmPassword;
     data['referral_code'] = referralCode;
     data['email'] = email;
+    data['medium'] = loginMedium;
     return data;
   }
 }

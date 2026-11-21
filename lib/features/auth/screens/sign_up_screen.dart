@@ -38,7 +38,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void initState() {
     super.initState();
 
-    Get.find<AuthController>().countryDialCode = CountryCode.fromCountryCode(Get.find<ConfigController>().config!.countryCode!).dialCode!;
+    Get.find<AuthController>().countryDialCode = Get.find<ConfigController>().countryDialCode;
     Get.find<AuthController>().loadAdditionalFields(false);
   }
 

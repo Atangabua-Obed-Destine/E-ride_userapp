@@ -17,6 +17,7 @@ class HomeScreenHelper{
             (
                 Get.find<RideController>().rideDetails!.currentStatus == 'pending' ||
                     Get.find<RideController>().rideDetails!.currentStatus == 'accepted'||
+                    Get.find<RideController>().rideDetails!.currentStatus == 'out_for_pickup' ||
                     Get.find<RideController>().rideDetails!.currentStatus == 'ongoing' ||
                     (
                         Get.find<RideController>().rideDetails!.currentStatus == 'completed' &&
@@ -31,10 +32,7 @@ class HomeScreenHelper{
 
     if(rideCount == 0 && parcelCount == 0){
       Get.find<ConfigController>().saveOngoingRides(false);
-      if(Get.find<ConfigController>().config!.maintenanceMode != null &&
-          Get.find<ConfigController>().config!.maintenanceMode!.maintenanceStatus == 1 &&
-          Get.find<ConfigController>().config!.maintenanceMode!.selectedMaintenanceSystem!.userApp == 1
-      ){
+      if(Get.find<ConfigController>().isUnderMaintenance){
         Get.offAll(() => const MaintenanceScreen());
       }
     }else{

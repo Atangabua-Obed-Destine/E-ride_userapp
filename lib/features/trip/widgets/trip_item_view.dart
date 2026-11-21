@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/enums/refund_status_enum.dart';
@@ -14,8 +15,10 @@ import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/images.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
 import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
-import 'package:ride_sharing_user_app/common_widgets/image_widget.dart';
 
+/// One trip in the Activity list: vehicle or parcel tile, destination, date
+/// and reference, with the fare and a status pill on the right. The tap
+/// routing below is unchanged from the shipped widget.
 class TripItemView extends StatefulWidget {
   final TripDetails tripDetails;
   const TripItemView({super.key, required this.tripDetails});
@@ -26,193 +29,156 @@ class TripItemView extends StatefulWidget {
 
 class _TripItemViewState extends State<TripItemView> {
 
+  TripDetails get trip => widget.tripDetails;
 
-  @override
-  void initState() {
+  bool get _isParcel => trip.type == AppConstants.parcel;
 
-    super.initState();
+  Color _statusColor(BuildContext context) {
+    switch (trip.currentStatus) {
+      case AppConstants.cancelled:
+        return Theme.of(context).colorScheme.error;
+      case AppConstants.completed:
+      case 'returned':
+        return const Color(0xFF1DB954);
+      case 'returning':
+        return Theme.of(context).hintColor;
+      default:
+        return Theme.of(context).primaryColor;
+    }
   }
 
-
-  @override
-  void dispose() {
-    super.dispose();
+  double? get _amount {
+    if (trip.estimatedFare == null) return null;
+    final bool settled = trip.currentStatus == AppConstants.cancelled || trip.currentStatus == AppConstants.completed ||
+        (trip.parcelInformation?.payer == AppConstants.sender && trip.currentStatus == AppConstants.ongoing) ||
+        trip.currentStatus == 'returning' || trip.currentStatus == 'returned';
+    if (settled) return trip.paidFare ?? 0;
+    return (trip.discountActualFare ?? 0) > 0 ? trip.discountActualFare! : (trip.actualFare ?? 0);
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: (){
-        if(widget.tripDetails.currentStatus == AppConstants.accepted || widget.tripDetails.currentStatus == AppConstants.outForPickup ||
-            widget.tripDetails.currentStatus == AppConstants.ongoing|| widget.tripDetails.currentStatus == AppConstants.pending){
-          if(widget.tripDetails.type == AppConstants.parcel){
-            _screenNavigationForParcel(widget.tripDetails);
+    final Color hint = Theme.of(context).hintColor;
+    final Color text = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final Color status = _statusColor(context);
+    final String? imageBase = Get.find<ConfigController>().config?.imageBaseUrl?.vehicleCategory;
 
-          }else{
-            if(widget.tripDetails.type == 'scheduled_request'){
-              _screenNavigationForScheduleRide(widget.tripDetails);
-
-            }else{
-              _screenNavigationForRide(widget.tripDetails);
-
-            }
-          }
-
-        }else{
-          if(widget.tripDetails.currentStatus == AppConstants.completed && widget.tripDetails.paymentStatus == AppConstants.unPaid){
-            Get.find<RideController>().getFinalFare(widget.tripDetails.id!).then((value){
-              Get.to(()=> PaymentScreen(fromParcel: widget.tripDetails.type == AppConstants.parcel ? true : false));
-            });
-
-          }else{
-            Get.to(()=> TripDetailsScreen(tripId: widget.tripDetails.id!));
-          }
-        }
-      },
-      child: Padding(padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Stack(children: [
-            Container(width: 80, height: Get.height * 0.105,
+    return Material(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _open,
+        child: Container(
+          padding: const EdgeInsets.all(Dimensions.paddingSize),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: hint.withValues(alpha: 0.14)),
+          ),
+          child: Row(children: [
+            Container(
+              width: 54, height: 54,
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.04) ,
+                color: hint.withValues(alpha: Get.isDarkMode ? 0.16 : 0.08),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Center(child: Column(children: [
-                ClipRRect(
-                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                    child: widget.tripDetails.type != AppConstants.parcel ?
-                    ImageWidget(
-                      width: 60, height: 60,
-                      image : '${Get.find<ConfigController>().config!.imageBaseUrl!.vehicleCategory!}/${widget.tripDetails.vehicleCategory?.image!}',
-                      fit: BoxFit.cover,
-                    ) :
-                    Image.asset(Images.parcel,height: 60,width: 30)
-                ),
-
-                Text(
-                  widget.tripDetails.type != AppConstants.parcel ?
-                  widget.tripDetails.vehicleCategory != null ?
-                  widget.tripDetails.vehicleCategory!.name!
-                      : '' :
-                  AppConstants.parcel.tr,
-                  style: textMedium.copyWith(
-                    fontSize: Dimensions.fontSizeExtraSmall,
-                    color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.7),
-                  ),
-                ),
-              ])),
-            ),
-
-            Positioned(
-              right: 0,
-              child: Container(
-                height: 20,width: 20,
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                    color:  widget.tripDetails.currentStatus == AppConstants.cancelled ?
-                    Theme.of(context).colorScheme.error.withValues(alpha:0.15) :
-                    widget.tripDetails.currentStatus == AppConstants.completed ?
-                    Theme.of(context).colorScheme.surfaceTint.withValues(alpha:0.15) :
-                    widget.tripDetails.currentStatus == 'returning' ?
-                    Theme.of(context).colorScheme.surfaceContainer.withValues(alpha:0.15) :
-                    widget.tripDetails.currentStatus == 'returned' ?
-                    Theme.of(context).colorScheme.surfaceTint.withValues(alpha:0.15) :
-                    Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha:0.3) ,
-                    shape: BoxShape.circle
-                ),
-                child: widget.tripDetails.currentStatus == AppConstants.cancelled ?
-                Image.asset(Images.crossIcon,color: Theme.of(context).colorScheme.error) :
-                widget.tripDetails.currentStatus == AppConstants.completed ?
-                Image.asset(Images.selectedIcon,color: Theme.of(context).colorScheme.surfaceTint) :
-                widget.tripDetails.currentStatus == 'returning' ?
-                Image.asset(Images.returnIcon,color: Theme.of(context).colorScheme.surfaceContainer) :
-                widget.tripDetails.currentStatus == 'returned' ?
-                Image.asset(Images.returnIcon,color: Theme.of(context).colorScheme.surfaceTint) :
-                Image.asset(Images.ongoingMarkerIcon,color: Theme.of(context).colorScheme.tertiaryContainer),
-              ),
-            )
-          ]),
-          const SizedBox(width: Dimensions.paddingSizeSmall),
-
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text (
-                  '${'trip_id'.tr}: ${widget.tripDetails.refId}',
-                  style: textRegular.copyWith(
-                    fontSize: Dimensions.fontSizeSmall,
-                    color: Theme.of(context).textTheme.bodyMedium?.color ,
-                  ),
-                ),
-
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).hintColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(Dimensions.paddingSizeThree)
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeExtraSmall),
-                  child: Text(
-                    DateConverter.isoStringToTripHistoryFormat(widget.tripDetails.createdAt!),
-                    style: textRegular.copyWith(
-                      fontSize: Dimensions.fontSizeExtraSmall,
-                      color: Theme.of(context).textTheme.bodyMedium?.color ,
+              child: _isParcel
+                  ? Image.asset(Images.parcel, fit: BoxFit.contain)
+                  : CachedNetworkImage(
+                      imageUrl: '$imageBase/${trip.vehicleCategory?.image ?? ''}',
+                      fit: BoxFit.contain,
+                      placeholder: (_, __) => Icon(Icons.directions_car_rounded, color: text.withValues(alpha: 0.55)),
+                      errorWidget: (_, __, ___) => Icon(Icons.directions_car_rounded, color: text.withValues(alpha: 0.55)),
                     ),
-                  ),
-                ),
-              ]),
-            const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+            ),
+            const SizedBox(width: Dimensions.paddingSize),
 
-            Row(spacing: Dimensions.paddingSizeSmall, children: [
-              if(widget.tripDetails.type != AppConstants.parcel)
-              Image.asset(
-                Images.activityDirection,
-                color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),height: 14,width: 14,
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                _isParcel ? (trip.parcelInformation?.parcelCategoryName ?? 'parcel'.tr) : (trip.destinationAddress ?? ''),
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: textSemiBold.copyWith(fontSize: Dimensions.fontSizeDefault, color: text),
               ),
+              const SizedBox(height: 3),
+              Text(
+                '${DateConverter.isoStringToTripHistoryFormat(trip.createdAt!)}  ·  '
+                '${_isParcel ? 'parcel'.tr : (trip.vehicleCategory?.name ?? '')}',
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: textRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: hint),
+              ),
+              const SizedBox(height: 3),
+              Row(children: [
+                Flexible(child: Text(
+                  '#${trip.refId ?? ''}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: textRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: hint),
+                )),
+                if (trip.parcelRefund?.status == RefundStatus.pending || trip.parcelRefund?.status == RefundStatus.approved) ...[
+                  const SizedBox(width: 6),
+                  Image.asset(Images.tripDetailsRefundIcon, height: 14, width: 14),
+                ],
+                if (trip.customerSafetyAlert != null) ...[
+                  const SizedBox(width: 6),
+                  Image.asset(Images.safelyShieldIcon1, height: 14, width: 14),
+                ],
+              ]),
+            ])),
+            const SizedBox(width: Dimensions.paddingSizeSmall),
 
-              Expanded(
-                child: Text( widget.tripDetails.type == AppConstants.parcel ?
-                widget.tripDetails.parcelInformation?.parcelCategoryName ?? '' :
-                widget.tripDetails.destinationAddress ?? '',
-                  style: textRegular.copyWith(
-                    color: Get.isDarkMode ?
-                    Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.9) :
-                    Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha:0.7),
-                  ),overflow: TextOverflow.ellipsis,
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              if (trip.isHealthRide)
+                Text('health_ride'.tr, maxLines: 1, style: textSemiBold.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).colorScheme.error)),
+              if (trip.isMove)
+                Text('move_label'.tr, maxLines: 1, style: textBold.copyWith(fontSize: Dimensions.fontSizeDefault, color: text))
+              else if (_amount != null)
+                Text(
+                  PriceConverter.convertPrice(_amount!),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: textBold.copyWith(fontSize: Dimensions.fontSizeDefault, color: text),
+                ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: status.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                child: Text(
+                  (trip.currentStatus ?? '').tr,
+                  style: textMedium.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: status),
                 ),
               ),
             ]),
-            const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-            SizedBox(width: Get.width*0.6, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              widget.tripDetails.estimatedFare!= null ?
-              Text(PriceConverter.convertPrice(
-                (
-                    widget.tripDetails.currentStatus == AppConstants.cancelled || widget.tripDetails.currentStatus == AppConstants.completed ||
-                    (widget.tripDetails.parcelInformation?.payer == AppConstants.sender && widget.tripDetails.currentStatus == AppConstants.ongoing) ||
-                    widget.tripDetails.currentStatus == 'returning' || widget.tripDetails.currentStatus == 'returned'
-                ) ?
-                  widget.tripDetails.paidFare! :
-                ( widget.tripDetails.discountActualFare! > 0 ? widget.tripDetails.discountActualFare! : widget.tripDetails.actualFare!),
-              ),
-                style: textRobotoBold.copyWith(
-                  fontSize: Dimensions.fontSizeSmall,
-                  color: Theme.of(context).textTheme.bodyMedium?.color,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ) :
-              const SizedBox(),
-
-              if((widget.tripDetails.parcelRefund?.status == RefundStatus.pending || widget.tripDetails.parcelRefund?.status == RefundStatus.approved))
-                Image.asset(Images.tripDetailsRefundIcon,height: 16,width: 16),
-
-              if(widget.tripDetails.customerSafetyAlert != null)
-                Image.asset(Images.safelyShieldIcon1,height: 16,width: 16)
-
-            ]))
-          ])),
-        ]),
+          ]),
+        ),
       ),
     );
+  }
+
+  void _open() {
+    if(trip.currentStatus == AppConstants.accepted || trip.currentStatus == AppConstants.outForPickup ||
+        trip.currentStatus == AppConstants.ongoing|| trip.currentStatus == AppConstants.pending){
+      if(trip.type == AppConstants.parcel){
+        _screenNavigationForParcel(trip);
+
+      }else{
+        if(trip.type == 'scheduled_request'){
+          _screenNavigationForScheduleRide(trip);
+
+        }else{
+          _screenNavigationForRide(trip);
+
+        }
+      }
+
+    }else{
+      if(trip.currentStatus == AppConstants.completed && trip.paymentStatus == AppConstants.unPaid){
+        Get.find<RideController>().getFinalFare(trip.id!).then((value){
+          Get.to(()=> PaymentScreen(fromParcel: trip.type == AppConstants.parcel ? true : false));
+        });
+
+      }else{
+        Get.to(()=> TripDetailsScreen(tripId: trip.id!));
+      }
+    }
   }
 
 }
@@ -221,7 +187,7 @@ void _screenNavigationForParcel(TripDetails tripDetails){
   Get.find<RideController>().getRideDetails(tripDetails.id!).then((value) {
     if(tripDetails.currentStatus == AppConstants.accepted){
       Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.otpSent);
-      Get.to(()=> const MapScreen(fromScreen: MapScreenType.parcel));
+      MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
 
     }else if (tripDetails.currentStatus == AppConstants.ongoing){
       Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.parcelOngoing);
@@ -230,12 +196,12 @@ void _screenNavigationForParcel(TripDetails tripDetails){
         Get.off(()=>const PaymentScreen(fromParcel: true));
 
       }else{
-        Get.to(()=> const MapScreen(fromScreen: MapScreenType.parcel));
+        MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
 
       }
     }else{
       Get.find<ParcelController>().updateParcelState(ParcelDeliveryState.findingRider);
-      Get.to(()=> const MapScreen(fromScreen: MapScreenType.parcel));
+      MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
 
     }
   });
@@ -250,7 +216,7 @@ void _screenNavigationForRide(TripDetails tripDetails){
     }else{
       Get.find<RideController>().updateRideCurrentState(RideState.findingRider);
     }
-    Get.to(()=> const MapScreen(fromScreen: MapScreenType.ride));
+    MapScreen.open(const MapScreen(fromScreen: MapScreenType.ride));
   });
 }
 
@@ -258,10 +224,10 @@ void _screenNavigationForScheduleRide(TripDetails tripDetails){
   Get.find<RideController>().getRideDetails(tripDetails.id!).then((value){
     if(tripDetails.currentStatus == AppConstants.outForPickup){
       Get.find<RideController>().updateRideCurrentState(RideState.outForPickup);
-      Get.to(()=> const MapScreen(fromScreen: MapScreenType.ride));
+      MapScreen.open(const MapScreen(fromScreen: MapScreenType.ride));
     }else if (tripDetails.currentStatus == AppConstants.ongoing){
       Get.find<RideController>().updateRideCurrentState(RideState.ongoingRide);
-      Get.to(()=> const MapScreen(fromScreen: MapScreenType.ride));
+      MapScreen.open(const MapScreen(fromScreen: MapScreenType.ride));
     }else{
       Get.to(()=> TripDetailsScreen(tripId: tripDetails.id ?? ''));
     }

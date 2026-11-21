@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -104,13 +105,25 @@ class AddressController extends GetxController implements GetxService {
   }
 
   Timer? _timer;
+  bool _sendingLocation = false;
   void updateLastLocation(){
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) async{
-      var location = await Geolocator.getCurrentPosition(
-          locationSettings: LocationSettings(accuracy: LocationAccuracy.high)
-      );
-      await addressServiceInterface.updateLastLocation(location.latitude.toString(), location.longitude.toString(), Get.find<LocationController>().zoneID ?? '');
+      // One reading at a time, and none while the app is hidden: position
+      // requests made in the background used to pile up and all send at once
+      // when the app came back (ten identical calls in a row).
+      if (_sendingLocation || WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
+      _sendingLocation = true;
+      try {
+        final location = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 8)),
+        );
+        await addressServiceInterface.updateLastLocation(location.latitude.toString(), location.longitude.toString(), Get.find<LocationController>().zoneID ?? '');
+      } catch (_) {
+        // No fix this time (GPS off, timeout): try again on the next tick.
+      } finally {
+        _sendingLocation = false;
+      }
     });
   }
 

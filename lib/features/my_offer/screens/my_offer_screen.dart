@@ -12,7 +12,6 @@ import 'package:ride_sharing_user_app/features/my_offer/screens/discount_screen.
 import 'package:ride_sharing_user_app/features/my_offer/widgets/discount_cart_widget.dart';
 import 'package:ride_sharing_user_app/features/my_offer/widgets/no_coupon_widget.dart';
 import 'package:ride_sharing_user_app/features/my_offer/widgets/offer_type_button_widget.dart';
-import 'package:ride_sharing_user_app/helper/responsive_helper.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
@@ -149,7 +148,7 @@ class _MyOfferScreenState extends State<MyOfferScreen> {
               ),
             ),
 
-            Positioned(top: Get.height * (GetPlatform.isIOS ? ResponsiveHelper.isTab ? 0.08 : 0.15 :  0.11), left: Dimensions.paddingSizeSmall,
+            Positioned(top: AppBarWidget.overlayTop(context), left: Dimensions.paddingSizeSmall,
               child: SizedBox(height: Get.find<LocalizationController>().isLtr ? 45 : 50,
                 width: Get.width-Dimensions.paddingSizeDefault,
                 child: ListView.builder(

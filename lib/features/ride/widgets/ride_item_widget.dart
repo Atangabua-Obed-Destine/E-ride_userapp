@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/common_widgets/image_widget.dart';
 import 'package:ride_sharing_user_app/features/map/controllers/map_controller.dart';
 import 'package:ride_sharing_user_app/features/map/screens/map_screen.dart';
 import 'package:ride_sharing_user_app/features/payment/screens/payment_screen.dart';
 import 'package:ride_sharing_user_app/features/ride/controllers/ride_controller.dart';
 import 'package:ride_sharing_user_app/features/ride/domain/models/trip_details_model.dart';
 import 'package:ride_sharing_user_app/features/safety_setup/controllers/safety_alert_controller.dart';
+import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 import 'package:ride_sharing_user_app/features/trip/screens/trip_details_screen.dart';
 import 'package:ride_sharing_user_app/helper/date_converter.dart';
 import 'package:ride_sharing_user_app/helper/price_converter.dart';
@@ -32,7 +34,7 @@ class RideItemWidget extends StatelessWidget {
               rideController.updateRideCurrentState(rideController.tripDetails?.currentStatus == AppConstants.outForPickup ?  RideState.outForPickup : RideState.ongoingRide );
               rideController.startLocationRecord();
               Get.find<MapController>().notifyMapController();
-              Get.to(() => const MapScreen(fromScreen: MapScreenType.splash));
+              MapScreen.open(const MapScreen(fromScreen: MapScreenType.splash));
 
             }else if(rideController.tripDetails?.currentStatus == AppConstants.accepted){
               Get.offAll(()=> TripDetailsScreen(tripId: tripDetails?.id ?? ''));
@@ -42,7 +44,7 @@ class RideItemWidget extends StatelessWidget {
                 Get.find<RideController>().updateRideCurrentState(RideState.findingRider);
                 Get.find<RideController>().getBiddingList(tripDetails!.id!, 1);
                 Get.find<MapController>().notifyMapController();
-                Get.to(() => const MapScreen(fromScreen: MapScreenType.splash));
+                MapScreen.open(const MapScreen(fromScreen: MapScreenType.splash));
 
               }else{
                 Get.to(() => TripDetailsScreen(tripId: tripDetails?.id ?? ''));
@@ -81,11 +83,9 @@ class RideItemWidget extends StatelessWidget {
                 ),
                 height: Dimensions.orderStatusIconHeight,width: Dimensions.orderStatusIconHeight,
                 child: Padding(padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                  child: Image.asset(
-                    tripDetails?.currentStatus == 'pending' ?
-                    Images.searchImageIcon :
-                    tripDetails!.vehicleCategory?.type == 'car' ? Images.car : Images.bike,
-                  ),
+                  child: tripDetails?.currentStatus == 'pending' ?
+                  Image.asset(Images.searchImageIcon) :
+                  ImageWidget(image: '${Get.find<ConfigController>().config?.imageBaseUrl?.vehicleCategory}/${tripDetails?.vehicleCategory?.image}'),
                 ),
               ),
               const SizedBox(width: Dimensions.paddingSizeDefault),
@@ -104,7 +104,9 @@ class RideItemWidget extends StatelessWidget {
                         borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall)
                     ),
                     child: Text(
-                      tripDetails?.currentStatus == 'pending' ? 'searching_driver'.tr : 'on_the_way'.tr,
+                      tripDetails?.currentStatus == 'pending' ? 'searching_driver'.tr
+                          // A ride booked ahead: the driver is assigned, not on the way yet.
+                          : (tripDetails?.type == AppConstants.scheduleRequest && tripDetails?.currentStatus == 'accepted') ? 'driver_assigned'.tr : 'on_the_way'.tr,
                       style: textRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall),
                     ),
                   )
@@ -117,6 +119,9 @@ class RideItemWidget extends StatelessWidget {
                   ),
                 ),
 
+                if (tripDetails?.isMove ?? false)
+                  Text('move_price_short'.tr, style: textRobotoRegular)
+                else
                 Text('${'total'.tr} ${PriceConverter.convertPrice(
                     (tripDetails?.parcelInformation?.payer == 'sender' && tripDetails?.currentStatus == 'ongoing') ?
                     tripDetails!.paidFare! :

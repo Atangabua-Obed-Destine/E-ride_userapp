@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
     <queries>
+        <!-- Offer "WhatsApp call" only when WhatsApp is installed -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -39,12 +44,14 @@
        android:fullBackupOnly="false">
 
 
-       <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyBlrnYeiGNzQByKArJo42VJTSbD-NDzCb0"/>
-       <meta-data android:name="com.google.android.gms.version"
-           android:value="@integer/google_play_services_version" />
+       <meta-data android:name="com.google.android.geo.API_KEY" android:value="MAPS_API_KEY_HERE"/>
+       <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
+
+       <meta-data android:name="com.facebook.sdk.ApplicationId" android:value="@string/facebook_app_id"/>
+       <meta-data android:name="com.facebook.sdk.ClientToken" android:value="@string/facebook_client_token"/>
+
        <!-- Necessary for apps that target Android 9.0 or higher -->
-       <uses-library android:name="org.apache.http.legacy"
-           android:required="false" />
+       <uses-library android:name="org.apache.http.legacy" android:required="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -64,7 +71,8 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <meta-data android:name="flutter_deeplinking_enabled" android:value="true" />
+            <!-- Links are read with app_links (lib/helper/login_helper.dart), not by Flutter's router. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -72,6 +80,23 @@
                 <data android:host="YOUR_DOMAIN_HERE" android:scheme="http"/>
                 <data android:host="YOUR_DOMAIN_HERE" android:scheme="https"/>
                 <data android:pathPrefix="/locate-user" />
+            </intent-filter>
+            <!-- E-Ride Market: shop (/s/slug) and item (/i/code) links. The host comes from
+                 the Gradle property marketLinkHost (the short market domain). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="${marketLinkHost}" android:pathPrefix="/s/"/>
+                <data android:scheme="https" android:host="${marketLinkHost}" android:pathPrefix="/i/"/>
+                <data android:scheme="https" android:host="${marketLinkHost}" android:pathPrefix="/j/"/>
+            </intent-filter>
+            <!-- "Open in the app" from the market web pages: eride://market/i/code -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="eride" android:host="market"/>
             </intent-filter>
         </activity>
         <meta-data

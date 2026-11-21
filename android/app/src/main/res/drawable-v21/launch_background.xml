@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Shown by the OS before Flutter has drawn a frame (Android 11 and below;
+    Android 12+ uses windowSplashScreen* in values-v31/styles.xml instead).
+    Deliberately matches the first frame of the Flutter splash so the hand-off
+    is invisible.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/splash_gradient"/>
     <item>
-        <bitmap android:gravity="fill" android:src="@drawable/background"/>
-    </item>
-    <item>
-        <bitmap android:gravity="center" android:src="@drawable/splash"/>
+        <bitmap android:gravity="center" android:src="@drawable/splash_logo_dark"/>
     </item>
 </layer-list>

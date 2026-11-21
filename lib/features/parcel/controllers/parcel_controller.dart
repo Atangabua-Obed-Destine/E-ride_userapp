@@ -1,3 +1,4 @@
+import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -10,6 +11,20 @@ import 'package:ride_sharing_user_app/features/parcel/domain/models/parcel_list_
 import 'package:ride_sharing_user_app/features/parcel/domain/models/suggested_vehicle_category_model.dart';
 import 'package:ride_sharing_user_app/features/parcel/domain/services/parcel_service_interface.dart';
 import 'package:ride_sharing_user_app/features/payment/controllers/payment_controller.dart';
+import 'package:ride_sharing_user_app/features/address/domain/models/address_model.dart';
+import 'package:ride_sharing_user_app/helper/country_code_helper.dart';
+
+/// A parcel booking opened from somewhere else with its details filled in
+/// (E-Ride Market: the seller sends an item to the buyer's delivery point).
+class ParcelPrefill {
+  final Address? sender;
+  final Address receiver;
+  final String receiverName;
+  final String? receiverPhone;
+  /// true: the receiver pays the rest of the fare; false: the sender; null: the sender chooses.
+  final bool? payReceiver;
+  const ParcelPrefill({this.sender, required this.receiver, required this.receiverName, this.receiverPhone, this.payReceiver});
+}
 
 enum ParcelDeliveryState{initial, parcelInfoDetails, addOtherParcelDetails, riseFare, findingRider, suggestVehicle, acceptRider, otpSent, parcelOngoing, parcelComplete}
 
@@ -73,8 +88,18 @@ class ParcelController extends GetxController with GetSingleTickerProviderStateM
   }
 
 
+  /// Set when the seller books an E-Ride Market delivery and the admin decided who
+  /// pays the rest of the fare (true: the buyer on delivery, false: the seller).
+  /// Null lets the sender choose, as for any parcel.
+  bool? lockedPayReceiver;
+
+  /// The buyer's first name, for the "E-Ride Market delivery" note on the parcel screen.
+  String? marketBuyerName;
+
   void initParcelData() {
     payReceiver = false;
+    lockedPayReceiver = null;
+    marketBuyerName = null;
     currentParcelState = ParcelDeliveryState.initial;
     tabController.index = 0;
     isLoading = false;
@@ -137,10 +162,27 @@ class ParcelController extends GetxController with GetSingleTickerProviderStateM
     update();
   }
 
+  /// Fills the booking from [prefill], after [initParcelData] cleared it.
+  void applyPrefill(ParcelPrefill prefill) {
+    final location = Get.find<LocationController>();
+    if (prefill.sender?.latitude != null) location.setSenderAddress(prefill.sender);
+    location.setReceiverAddress(prefill.receiver);
+    receiverNameController.text = prefill.receiverName;
+    final String phone = prefill.receiverPhone ?? '';
+    final String? code = phone.isEmpty ? null : CountryCodeHelper.getCountryCode(phone);
+    _receiverCountryDialCode = code ?? '+237';
+    receiverContactController.text = code == null ? phone : phone.replaceFirst(code, '');
+    marketBuyerName = prefill.receiverName;
+    lockedPayReceiver = prefill.payReceiver;
+    updatePaymentPerson(prefill.payReceiver ?? true);
+  }
+
   void updatePaymentPerson(bool newValue, {bool notify = true}) {
-    payReceiver = newValue;
-    if(newValue == true){
-      Get.find<PaymentController>().setPaymentType(0);
+    payReceiver = lockedPayReceiver ?? newValue;
+    // The receiver pays on delivery, in cash: with cash turned off, the sender pays in the app.
+    if (!(Get.find<ConfigController>().config?.paymentCashStatus ?? true)) payReceiver = false;
+    if(payReceiver == true){
+      Get.find<PaymentController>().selectPaymentType('cash');
     }
     if(notify){
       update();
@@ -234,11 +276,8 @@ class ParcelController extends GetxController with GetSingleTickerProviderStateM
 
 
   Future<void> focusOnBottomSheet(GlobalKey<ExpandableBottomSheetState> key) async {
-    if(key.currentState?.expansionStatus == ExpansionStatus.expanded) {
-      // ignore: invalid_use_of_protected_member
-      key.currentState?.reassemble();
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
+    // After the keyboard has opened: it adds its height to the sheet's content.
+    await Future.delayed(const Duration(milliseconds: 500));
     key.currentState?.expand(duration: 200);
   }
 

@@ -1,22 +1,22 @@
-import 'dart:convert';
+import 'package:ride_sharing_user_app/features/profile/controllers/profile_controller.dart';
+import 'package:ride_sharing_user_app/features/message/controllers/chat_inbox_controller.dart';
+import 'dart:async';
 import 'dart:io';
-import 'package:dart_pusher_channels/dart_pusher_channels.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:ride_sharing_user_app/data/api_checker.dart';
 import 'package:ride_sharing_user_app/data/api_client.dart';
-import 'package:ride_sharing_user_app/features/auth/controllers/auth_controller.dart';
 import 'package:ride_sharing_user_app/features/message/domain/services/message_service_interface.dart';
 import 'package:ride_sharing_user_app/features/message/screens/message_screen.dart';
 import 'package:ride_sharing_user_app/features/message/domain/models/channel_model.dart';
 import 'package:ride_sharing_user_app/features/message/domain/models/message_model.dart';
 import 'package:get/get.dart';
-import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 import 'package:ride_sharing_user_app/helper/display_helper.dart';
 import 'package:ride_sharing_user_app/helper/file_validation_helper.dart';
-import 'package:ride_sharing_user_app/helper/pusher_helper.dart';
 import 'package:ride_sharing_user_app/util/app_constants.dart';
 
 
@@ -61,7 +61,108 @@ class MessageController extends GetxController implements GetxService{
     conversationController.text = '';
   }
 
+  @override
+  void onClose() {
+    _recordTimer?.cancel();
+    _amplitudeSub?.cancel();
+    _audioRecorder.dispose();
+    super.onClose();
+  }
+
   bool isImagePicked = false;
+
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool isRecording = false;
+  Duration recordDuration = Duration.zero;
+  Timer? _recordTimer;
+  StreamSubscription<Amplitude>? _amplitudeSub;
+  String? _recordedFilePath;
+  final List<double> voiceAmplitudes = [];
+
+  Future<void> startVoiceRecording() async {
+    if (!await _audioRecorder.hasPermission()) {
+      showCustomSnackBar('microphone_permission'.tr, isError: true);
+      return;
+    }
+
+    final Directory tempDir = await getTemporaryDirectory();
+    final String path = '${tempDir.path}/voice_message_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    await _audioRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+
+    _recordedFilePath = path;
+    isRecording = true;
+    recordDuration = Duration.zero;
+    voiceAmplitudes.clear();
+
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      recordDuration += const Duration(seconds: 1);
+      update();
+    });
+
+    _amplitudeSub = _audioRecorder.onAmplitudeChanged(const Duration(milliseconds: 200)).listen((amplitude) {
+      voiceAmplitudes.add(amplitude.current);
+      if (voiceAmplitudes.length > 20) {
+        voiceAmplitudes.removeAt(0);
+      }
+      update();
+    });
+
+    update();
+  }
+
+  Future<void> cancelVoiceRecording() async {
+    _recordTimer?.cancel();
+    await _amplitudeSub?.cancel();
+    if (await _audioRecorder.isRecording()) {
+      await _audioRecorder.stop();
+    }
+    if (_recordedFilePath != null) {
+      final File recordedFile = File(_recordedFilePath!);
+      if (await recordedFile.exists()) {
+        await recordedFile.delete();
+      }
+    }
+    _recordedFilePath = null;
+    isRecording = false;
+    recordDuration = Duration.zero;
+    voiceAmplitudes.clear();
+    update();
+  }
+
+  Future<void> stopAndSendVoiceRecording(String channelId, String tripId) async {
+    _recordTimer?.cancel();
+    await _amplitudeSub?.cancel();
+    final String? path = await _audioRecorder.stop();
+    final String? recordedPath = path ?? _recordedFilePath;
+
+    isRecording = false;
+    recordDuration = Duration.zero;
+    voiceAmplitudes.clear();
+    update();
+
+    if (recordedPath == null) {
+      return;
+    }
+
+    final File recordedFile = File(recordedPath);
+    final int size = await recordedFile.length();
+    final PlatformFile voiceFile = PlatformFile(
+      path: recordedPath,
+      name: 'voice_message_${DateTime.now().millisecondsSinceEpoch}.m4a',
+      size: size,
+      readStream: recordedFile.openRead(),
+    );
+
+    if (!await FileValidationHelper.validatePlatformFileSizeAsync(file: voiceFile)) {
+      await recordedFile.delete();
+      return;
+    }
+
+    objFile = voiceFile;
+    _recordedFilePath = null;
+    await sendMessage(channelId, tripId);
+  }
 
   void pickMultipleImage(bool isRemove,{int? index}) async {
     if(isRemove) {
@@ -195,6 +296,19 @@ class MessageController extends GetxController implements GetxService{
 
   bool isSending = false;
   Future<void> sendMessage(String channelId , String tripId) async{
+    final String pendingText = conversationController.value.text.trim();
+    final bool textOnly = pendingText.isNotEmpty && _selectedImageList.isEmpty && objFile == null;
+    Message? pending;
+    if (textOnly && messageModel?.data != null) {
+      pending = Message(
+        message: pendingText,
+        tripId: messageModel!.data!.isNotEmpty ? messageModel!.data!.first.tripId : null,
+        user: User(id: Get.find<ProfileController>().profileModel?.data?.id),
+        isPending: true,
+        conversationFiles: [],
+      )..createdAt = DateTime.now().toUtc().toIso8601String();
+      messageModel!.data!.insert(0, pending);
+    }
     isSending = true;
     update();
     Response response = await messageServiceInterface.sendMessage(conversationController.value.text,
@@ -211,6 +325,7 @@ class MessageController extends GetxController implements GetxService{
     }
     else if(response.statusCode == 400){
       isSending = false;
+      _markFailed(pending);
       String message = response.body['errors'][0]['message'];
       if(message.contains("png  jpg  jpeg  csv  txt  xlx  xls  pdf")){
         message = "the_files_types_must_be";
@@ -227,6 +342,7 @@ class MessageController extends GetxController implements GetxService{
     }
     else{
       isSending = false;
+      _markFailed(pending);
       _pickedImageFiles = [];
       _selectedImageList = [];
       _otherFile=null;
@@ -238,43 +354,61 @@ class MessageController extends GetxController implements GetxService{
     update();
   }
 
-  late PrivateChannel channel;
-  String id ="";
-
+  /// Kept for existing callers: the trip chat is now kept live by
+  /// [ChatInboxController], which also survives reconnects.
   void subscribeMessageChannel(String tripId){
-    id = "";
-    if(id == ""){
-      id = tripId;
-    }
-
-    if (Get.find<ConfigController>().pusherConnectionStatus != null || Get.find<ConfigController>().pusherConnectionStatus == 'Connected'){
-      channel = PusherHelper.pusherClient!.privateChannel("private-customer-ride-chat.$id", authorizationDelegate:
-      EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
-        authorizationEndpoint: Uri.parse('https://${Get.find<ConfigController>().config!.webSocketUrl}/broadcasting/auth'),
-        headers:  {
-          "Accept": "application/json",
-          "Authorization": "Bearer ${Get.find<AuthController>().getUserToken()}",
-          "Access-Control-Allow-Origin": "*",
-          'Access-Control-Allow-Methods':"PUT, GET, POST, DELETE, OPTIONS"
-        },
-      ));
-
-      if(channel.currentStatus == null){
-        channel.subscribe();
-        channel.bind("customer-ride-chat.$id").listen((event) {
-          if(id == jsonDecode(event.data!)['channel_conversation']['channel']['trip_id']){
-            messageModel!.data!.insert(0,Message.fromJson(jsonDecode(event.data!)['channel_conversation']));
-            update();
-          }
-        });
-      }
-    }
-
-
+    Get.find<ChatInboxController>().watchTrip(tripId);
   }
 
+  /// A message that arrived over the websocket while this chat is open.
+  void insertIncoming(Message message) {
+    final List<Message>? list = messageModel?.data;
+    if (list == null) return;
+    if (message.id != null && list.any((m) => m.id == message.id)) return;
+    list.insert(0, message);
+    messageModel!.totalSize = (messageModel!.totalSize ?? 0) + 1;
+    update();
+  }
 
+  /// The other party read the chat: every message I sent is now "seen".
+  void markMineRead() {
+    final List<Message>? list = messageModel?.data;
+    final String? me = Get.find<ProfileController>().profileModel?.data?.id;
+    if (list == null || me == null) return;
+    for (final Message m in list) {
+      if ((m.user?.id ?? m.userId) == me && !m.isPending) m.isRead = true;
+    }
+    update();
+  }
 
+  void _markFailed(Message? pending) {
+    if (pending == null) return;
+    pending
+      ..isPending = false
+      ..isFailed = true;
+  }
+
+  /// Sends a failed text message again.
+  Future<void> retryMessage(Message failed, String channelId, String tripId) async {
+    messageModel?.data?.remove(failed);
+    conversationController.text = failed.message ?? '';
+    // sendMessage reads the text before its first await, so the box can be
+    // cleared straight away.
+    final Future<void> sending = sendMessage(channelId, tripId);
+    conversationController.clear();
+    update();
+    await sending;
+  }
+
+  /// Sends a quick reply chip as a message.
+  Future<void> sendQuickReply(String text, String channelId, String tripId) async {
+    if (isSending) return;
+    conversationController.text = text;
+    final Future<void> sending = sendMessage(channelId, tripId);
+    conversationController.clear();
+    update();
+    await sending;
+  }
 
   bool _channelRideStatus = true;
   bool get channelRideStatus => _channelRideStatus;

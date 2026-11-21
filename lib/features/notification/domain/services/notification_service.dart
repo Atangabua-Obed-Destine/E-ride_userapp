@@ -12,6 +12,21 @@ class NotificationService implements NotificationServiceInterface{
   }
 
   @override
+  Future getGroupList({int offset = 1, String? group}) async{
+    return await notificationRepositoryInterface.getGroupList(offset: offset, group: group);
+  }
+
+  @override
+  Future getCounts() async{
+    return await notificationRepositoryInterface.getCounts();
+  }
+
+  @override
+  Future readAll({String? group}) async{
+    return await notificationRepositoryInterface.readAll(group: group);
+  }
+
+  @override
   Future sendReadStatus(int notificationId) async{
     return await notificationRepositoryInterface.sendReadStatus(notificationId);
   }

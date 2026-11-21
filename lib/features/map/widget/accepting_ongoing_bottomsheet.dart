@@ -1,9 +1,16 @@
+import 'package:ride_sharing_user_app/features/area_safety/widgets/area_safety_widgets.dart';
+import 'package:ride_sharing_user_app/features/health_ride/widgets/health_ride_widgets.dart';
+import 'package:ride_sharing_user_app/features/ride/widgets/drop_price_ride_note.dart';
+import 'package:ride_sharing_user_app/common_widgets/trip_arrival_card.dart';
+import 'package:ride_sharing_user_app/common_widgets/waiting_charge_card.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/features/move/widgets/move_widgets.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/expandable_bottom_sheet.dart';
 import 'package:ride_sharing_user_app/common_widgets/swipable_button_widget/slider_button_widget.dart';
 import 'package:ride_sharing_user_app/features/dashboard/controllers/bottom_menu_controller.dart';
+import 'package:ride_sharing_user_app/features/deposit/widgets/deposit_widgets.dart';
 import 'package:ride_sharing_user_app/features/home/widgets/banner_shimmer.dart';
 import 'package:ride_sharing_user_app/features/location/controllers/location_controller.dart';
 import 'package:ride_sharing_user_app/features/map/controllers/map_controller.dart';
@@ -21,6 +28,7 @@ import 'package:ride_sharing_user_app/helper/date_converter.dart';
 import 'package:ride_sharing_user_app/helper/price_converter.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
 import 'package:ride_sharing_user_app/util/app_constants.dart';
+import 'package:ride_sharing_user_app/features/trip_share/widgets/share_trip_card.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/images.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
@@ -37,6 +45,12 @@ class AcceptingAndOngoingBottomSheet extends StatefulWidget {
 
 class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBottomSheet> {
   int currentState = 0;
+  // One cancel at a time: a double tap sent two cancels and two final fares.
+  bool _cancelling = false;
+
+  void _cancelDone() {
+    if (mounted) setState(() => _cancelling = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,19 +61,51 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           rideController.currentRideState == RideState.outForPickup ?
           Column(children: [
-            TollTipWidget(title: 'rider_is_coming'.tr),
+            // Waiting for the deposit: the driver sets off once it is paid,
+            // so the pickup code is not needed yet.
+            if (rideController.tripDetails!.deposit?.isAwaiting ?? false)
+              DepositCard(trip: rideController.tripDetails!)
+            else ...[
+              TollTipWidget(title: 'rider_is_coming'.tr),
 
-            if(Get.find<ConfigController>().config?.otpConfirmationForTrip ?? false)
-              const OtpWidget(isParcel: false),
+              if(Get.find<ConfigController>().config?.otpConfirmationForTrip ?? false)
+                const OtpWidget(isParcel: false),
+              const SizedBox(height: Dimensions.paddingSizeSmall),
+              DepositCard(trip: rideController.tripDetails!),
+              MoveNoAgreementButton(trip: rideController.tripDetails!),
+            ],
           ]) :
           TollTipWidget(title: '${'drop_off'.tr} ${DateConverter.dateToTimeOnly(DateTime.now().add(Duration(seconds: rideController.remainingDistanceModel.isNotEmpty ? rideController.remainingDistanceModel[0].durationSec ?? 0 : 0)))}'),
           const SizedBox(height: Dimensions.paddingSizeDefault),
+
+          // How close the trip is to the drop-off, always visible on the way.
+          if (rideController.currentRideState != RideState.outForPickup && rideController.tripDetails?.currentStatus == AppConstants.ongoing) ...[
+            TripArrivalCard(
+              remainingKm: rideController.remainingDistanceModel.isNotEmpty ? rideController.remainingDistanceModel[0].distance : null,
+              totalKm: double.tryParse(rideController.estimatedDistance),
+              eta: rideController.remainingDistanceModel.isNotEmpty ? rideController.remainingDistanceModel[0].duration : null,
+              forDriver: false,
+            ),
+            const SizedBox(height: Dimensions.paddingSizeDefault),
+          ],
+
+          // Paid waiting: live while the driver has paused the trip.
+          if (rideController.currentRideState != RideState.outForPickup && (rideController.tripDetails?.waiting?.worthShowing ?? false)) ...[
+            WaitingChargeCard(
+              waiting: rideController.tripDetails!.waiting!,
+              forDriver: false,
+              formatPrice: (amount) => PriceConverter.convertPrice(amount),
+            ),
+            const SizedBox(height: Dimensions.paddingSizeDefault),
+          ],
 
           const EstimatedFareAndDistance(),
           const SizedBox(height: Dimensions.paddingSizeDefault),
 
           const ActivityScreenRiderDetails(),
           const SizedBox(height: Dimensions.paddingSizeDefault),
+          const ShareTripCard(),
+          const ReportDangerLink(),
 
           Padding(
             padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
@@ -78,6 +124,18 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
             ),
           const SizedBox(height: Dimensions.paddingSizeDefault),
 
+          // Drop price: holds when the ride ends at the destination.
+          if (rideController.tripDetails!.isDropFare) DropPriceRideNote(trip: rideController.tripDetails!),
+          // Health ride: the numbers to call stay at hand during the ride.
+          if (rideController.tripDetails!.isHealthRide) ...[
+            const HealthRideNotice(compact: true),
+            const SizedBox(height: Dimensions.paddingSizeSmall),
+          ],
+
+          if (rideController.tripDetails!.isMove) ...[
+            MoveLoadSummary(trip: rideController.tripDetails!),
+            const MovePriceRow(),
+          ] else
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
@@ -191,6 +249,9 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
           ),
           const SizedBox(height: Dimensions.paddingSizeSmall),
 
+          if (rideController.currentRideState == RideState.outForPickup)
+            DepositCancelNote(deposit: rideController.tripDetails?.deposit),
+
           CancellationRadioButton(
             isOngoing: rideController.currentRideState == RideState.outForPickup ? false : true,
             expandableKey: widget.expandableKey,
@@ -221,6 +282,8 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
               borderColor: Theme.of(context).hintColor,
               radius: Dimensions.paddingSizeSmall,
               onPressed: (){
+                if (_cancelling) return;
+                setState(() => _cancelling = true);
                 if(rideController.currentRideState == RideState.outForPickup){
                   Get.find<RideController>().stopLocationRecord();
                   rideController.tripStatusUpdate(
@@ -234,7 +297,7 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
                       Get.find<MapController>().notifyMapController();
                       Get.find<BottomMenuController>().navigateToDashboard();
                     }
-                  });
+                  }).whenComplete(_cancelDone);
                 }else{
                   rideController.tripStatusUpdate(
                       rideController.tripDetails!.id!,
@@ -244,7 +307,13 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
                       Get.find<TripController>().rideCancellationReasonList!.data!.ongoingRide![Get.find<TripController>().rideCancellationCauseCurrentIndex],
                       afterAccept: true
                   ).then((value) async {
-                    if(value.statusCode == 200){
+                    if(value.statusCode == 200 && (rideController.tripDetails?.isMove ?? false)){
+                      // A move is paid to the driver in person: nothing to pay here.
+                      Get.find<RideController>().stopLocationRecord();
+                      rideController.tripDetails = null;
+                      Get.find<MapController>().notifyMapController();
+                      Get.find<BottomMenuController>().navigateToDashboard();
+                    } else if(value.statusCode == 200){
                       Get.find<RideController>().stopLocationRecord();
                       rideController.getFinalFare(rideController.tripDetails!.id!).then((value) {
                         if(value.statusCode == 200){
@@ -254,7 +323,7 @@ class _AcceptingAndOngoingBottomSheetState extends State<AcceptingAndOngoingBott
                         }
                       });
                     }
-                  });
+                  }).whenComplete(_cancelDone);
                 }
               },
             )),

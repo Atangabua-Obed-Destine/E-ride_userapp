@@ -17,7 +17,7 @@ class DottedBorderCard extends StatelessWidget {
         if(Get.find<ParcelController>().parcelCategoryList == null || Get.find<ParcelController>().parcelCategoryList!.isEmpty) {
           showCustomSnackBar('no_parcel_category_found'.tr);
         }else {
-          Get.to(() => const MapScreen(fromScreen: MapScreenType.parcel));
+          MapScreen.open(const MapScreen(fromScreen: MapScreenType.parcel));
         }
       },
       child: Padding(padding: const EdgeInsets.only(top: Dimensions.paddingSizeDefault),

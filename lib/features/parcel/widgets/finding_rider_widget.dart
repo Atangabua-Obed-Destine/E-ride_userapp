@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/features/health_ride/widgets/health_ride_widgets.dart';
+import 'package:ride_sharing_user_app/features/move/widgets/move_widgets.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/expandable_bottom_sheet.dart';
 import 'package:ride_sharing_user_app/common_widgets/swipable_button_widget/slider_button_widget.dart';
@@ -13,6 +15,7 @@ import 'package:ride_sharing_user_app/features/dashboard/controllers/bottom_menu
 import 'package:ride_sharing_user_app/features/map/controllers/map_controller.dart';
 import 'package:ride_sharing_user_app/features/parcel/controllers/parcel_controller.dart';
 import 'package:ride_sharing_user_app/features/ride/controllers/ride_controller.dart';
+import 'package:ride_sharing_user_app/features/ride/widgets/driver_search_radar.dart';
 
 enum FindingRide{ride, parcel}
 
@@ -51,35 +54,16 @@ class _FindingRiderWidgetState extends State<FindingRiderWidget> {
             ),
             const SizedBox(height: Dimensions.paddingSizeSmall),
 
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              SizedBox(width: MediaQuery.of(context).size.width *0.27,
-                  child: LinearProgressIndicator(
-                    backgroundColor: Colors.grey.withValues(alpha:.50),
-                    color: Theme.of(context).primaryColor,value: rideController.firstCount,
-                  ),
-              ),
-
-              SizedBox(width: MediaQuery.of(context).size.width *0.27,
-                  child: LinearProgressIndicator(
-                    backgroundColor: Colors.grey.withValues(alpha:.50),
-                    color: Theme.of(context).primaryColor,value: rideController.secondCount,
-                  ),
-              ),
-
-              SizedBox(width: MediaQuery.of(context).size.width *0.27,
-                  child: LinearProgressIndicator(
-                    backgroundColor: Colors.grey.withValues(alpha:.50),
-                    color: Theme.of(context).primaryColor,value: rideController.thirdCount,
-                  ),
-              ),
-            ]),
-
+            // Radar + segmented stage bar, driven by the same stateCount and
+            // first/second/third counters the old progress bars read. Only the
+            // presentation changed; the escalation logic below is untouched.
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  vertical: Dimensions.paddingSizeDefault
-              ),
-              child: Image.asset(
-                rideController.stateCount  == 3 ? Images.newBidFareIcon : Images.findRiderIcon, width: 70,
+              padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeDefault),
+              child: DriverSearchRadar(
+                stage: rideController.stateCount,
+                first: rideController.firstCount ?? 0,
+                second: rideController.secondCount ?? 0,
+                third: rideController.thirdCount ?? 0,
               ),
             ),
 
@@ -124,6 +108,23 @@ class _FindingRiderWidgetState extends State<FindingRiderWidget> {
                 ),
               ),
 
+              // A move has no fare to raise: offer the truck owners to call instead.
+              if (rideController.tripDetails?.isMove ?? false)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: Dimensions.paddingSizeExtraOverLarge,
+                    right: Dimensions.paddingSizeExtraOverLarge,
+                    bottom: Dimensions.paddingSizeDefault,
+                  ),
+                  child: MoveDirectoryLink(vehicleCategoryId: rideController.tripDetails?.vehicleCategory?.id, prominent: true),
+                )
+              // A health ride has no fare to raise: the emergency numbers instead.
+              else if (rideController.tripDetails?.isHealthRide ?? false)
+                const Padding(
+                  padding: EdgeInsets.only(left: Dimensions.paddingSizeDefault, right: Dimensions.paddingSizeDefault, bottom: Dimensions.paddingSizeDefault),
+                  child: HealthRideNotice(compact: true),
+                )
+              else
               Padding(
                 padding: const EdgeInsets.only(
                   left: Dimensions.paddingSizeExtraOverLarge ,

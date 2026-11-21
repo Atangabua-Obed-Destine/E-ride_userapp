@@ -1,12 +1,14 @@
+import 'package:ride_sharing_user_app/features/splash/domain/models/config_model.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 
 class PriceConverter {
 
   static String convertPrice(double price, {double? discount, String? discountType,bool? loyaltyPoint}) {
-    bool inRight = Get.find<ConfigController>().config!.currencySymbolPosition == 'right';
-    String decimal = Get.find<ConfigController>().config!.currencyDecimalPoint ?? '1';
-    String symbol = loyaltyPoint == null ? Get.find<ConfigController>().config!.currencySymbol?? '\$' : '';
+    final ConfigModel? config = Get.find<ConfigController>().config;
+    bool inRight = config?.currencySymbolPosition == 'right';
+    String decimal = config?.currencyDecimalPoint ?? '1';
+    String symbol = loyaltyPoint == null ? (config?.currencySymbol ?? '\$') : '';
     String finalResult;
     if(discount != null && discountType != null){
       if(discountType == 'amount') {

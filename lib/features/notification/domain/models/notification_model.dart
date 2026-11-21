@@ -44,6 +44,10 @@ class Notifications {
   String? createdAt;
   String? notificationType;
   bool? isRead;
+  /// The part of E-Ride it comes from: trips, travel, market, jobs, homes, food, safety, wallet, other.
+  String? group;
+  /// What it is about (order_id, job_code, listing_id, user_name...), as in its push.
+  Map<String, dynamic> data = const {};
 
   Notifications(
       {this.id,
@@ -69,6 +73,8 @@ class Notifications {
     createdAt = json['created_at'];
     isRead = json['is_read'] != null ? (bool.tryParse(json['is_read'].toString()) ?? (json['is_read'].toString() == '1')) : null;
     notificationType = json['notification_type'];
+    group = json['group'];
+    data = json['data'] is Map ? Map<String, dynamic>.from(json['data']) : const {};
   }
 
 

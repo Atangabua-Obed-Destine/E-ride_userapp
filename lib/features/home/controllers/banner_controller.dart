@@ -15,12 +15,6 @@ class BannerController extends GetxController implements GetxService {
   List<Banner>? bannerList;
 
 
-  @override
-  void onInit() {
-    super.onInit();
-    getBannerList();
-  }
-
   Future<void> getBannerList() async {
     isLoading = true;
     Response? response = await bannerRepo.getBannerList();

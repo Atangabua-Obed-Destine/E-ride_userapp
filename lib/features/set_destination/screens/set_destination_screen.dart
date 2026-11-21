@@ -1,9 +1,12 @@
+import 'package:ride_sharing_user_app/features/assistant/widgets/need_results.dart';
+import 'package:ride_sharing_user_app/features/bus/controllers/bus_controller.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:get/get.dart';
-import 'package:ride_sharing_user_app/common_widgets/custom_text_field.dart';
+import 'package:ride_sharing_user_app/features/move/controllers/move_controller.dart';
+import 'package:ride_sharing_user_app/features/home/controllers/category_controller.dart';
 import 'package:ride_sharing_user_app/features/dashboard/screens/dashboard_screen.dart';
 import 'package:ride_sharing_user_app/features/parcel/controllers/parcel_controller.dart';
 import 'package:ride_sharing_user_app/features/ride/widgets/ride_category.dart';
@@ -27,15 +30,19 @@ import 'package:ride_sharing_user_app/common_widgets/app_bar_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/body_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/divider_widget.dart';
 import 'dart:math' as math;
-import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
+import 'package:ride_sharing_user_app/features/health_ride/widgets/health_ride_widgets.dart';
+import 'package:ride_sharing_user_app/features/ride/widgets/pickup_help.dart';
 
-import '../../../helper/extensin_helper.dart';
 
 class SetDestinationScreen extends StatefulWidget {
   final Address? address;
   final String? searchText;
   final RideType rideType;
-  const SetDestinationScreen({super.key, this.address,this.searchText, this.rideType = RideType.regularRide});
+  /// E-Ride Move: book a truck; the price is agreed with the driver.
+  final bool move;
+  /// Health ride: an urgent ride to care, for now only, with no surge or bidding.
+  final bool health;
+  const SetDestinationScreen({super.key, this.address,this.searchText, this.rideType = RideType.regularRide, this.move = false, this.health = false});
 
   @override
   State<SetDestinationScreen> createState() => _SetDestinationScreenState();
@@ -61,8 +68,18 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
     Get.find<RideController>().clearExtraRoute();
     Get.find<MapController>().initializeData();
     Get.find<RideController>().initData();
+    Get.find<RideController>().setMoveMode(widget.move);
+    Get.find<RideController>().setHealthMode(widget.health && !widget.move);
+    if (widget.move) {
+      // After the first frame: these notify GetBuilders, which cannot rebuild mid-build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.find<CategoryController>().getMoveCategoryList();
+        Get.find<MoveController>().resetBooking();
+      });
+    }
     Get.find<ParcelController>().updatePaymentPerson(false, notify: false);
     Get.find<LocationController>().setPickUp(Get.find<LocationController>().getUserAddress());
+    WidgetsBinding.instance.addPostFrameCallback((_) => Get.find<LocationController>().refreshPickupFromGps());
 
     if(widget.address != null) {
       Get.find<LocationController>().setDestination(widget.address);
@@ -74,6 +91,13 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
       });
     }
 
+    // Bus destinations for the smart search ("bus Douala"): kept for 5 minutes.
+    if (_smartSearch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (Get.isRegistered<BusController>()) Get.find<BusController>().loadMeta();
+      });
+    }
+
     keyboardSubscription = keyboardVisibilityController.onChange.listen((bool visible) {
       if(!visible){
         bottomWhiteSpace = 0;
@@ -81,6 +105,23 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
     });
 
   }
+
+  final GlobalKey _stackKey = GlobalKey();
+
+  /// Room for the results between their top and the keyboard (the screen does
+  /// not shrink for it), measured where the list really starts on screen.
+  double _resultsMaxHeight(BuildContext context) {
+    final RenderBox? stack = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final double stackTop = (stack != null && stack.hasSize) ? stack.localToGlobal(Offset.zero).dy : 140;
+    // The window's own numbers: the Scaffold hides the keyboard from the body's MediaQuery.
+    final MediaQueryData window = MediaQueryData.fromView(View.of(context));
+    final double bottom = window.size.height - math.max(window.viewInsets.bottom, window.padding.bottom);
+    // At least one row and a bit, so a small phone still shows something to scroll.
+    return math.max(100, bottom - stackTop - dialogTopPosition - 12);
+  }
+
+  /// Needs in the destination field: on ride bookings, not on Move or health rides.
+  bool get _smartSearch => !widget.move && !widget.health && widget.rideType == RideType.regularRide;
 
   @override
   void dispose() {
@@ -95,7 +136,7 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
       body: GetBuilder<RideController>(builder: (rideController){
         return BodyWidget(
           appBar: AppBarWidget(
-            title: rideController.rideType == RideType.scheduleRide ? 'schedule_trip_setup'.tr : 'trip_setup'.tr, centerTitle: true,
+            title: widget.move ? 'move_setup'.tr : widget.health ? 'health_ride'.tr : rideController.rideType == RideType.scheduleRide ? 'schedule_trip_setup'.tr : 'trip_setup'.tr, centerTitle: true,
             onBackPressed: () {
               if(Navigator.canPop(context)) {
                 Get.back();
@@ -105,7 +146,7 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
             },
           ),
           body: GetBuilder<LocationController>(builder: (locationController) {
-            return Stack(clipBehavior: Clip.none, children: [
+            return Stack(key: _stackKey, clipBehavior: Clip.none, children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   Dimensions.paddingSizeDefault, Dimensions.paddingSizeDefault,
@@ -115,15 +156,25 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
                   RideCategoryWidget(),
                   const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                  PickupTimeDateWidget(),
+                  // Moves are booked for now only; health rides too, unless the admin lets them be booked ahead.
+                  if (widget.health) const HealthRideNotice(),
+                  if (!widget.move && (!widget.health || (Get.find<ConfigController>().config?.healthRideSchedule ?? false))) PickupTimeDateWidget(),
 
-                  Text('set_your_location'.tr, style: textSemiBold),
-                  const SizedBox(height: Dimensions.paddingSizeSmall),
+                  Row(children: [
+                    Container(
+                      width: 4, height: 18,
+                      margin: const EdgeInsets.only(right: Dimensions.paddingSizeSmall),
+                      decoration: BoxDecoration(color: Theme.of(context).primaryColor, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    Text('set_your_location'.tr, style: textBold.copyWith(fontSize: Dimensions.fontSizeLarge)),
+                  ]),
+                  const SizedBox(height: Dimensions.paddingSize),
 
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).hintColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(Dimensions.paddingSizeSmall),
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Theme.of(context).hintColor.withValues(alpha: 0.18)),
                     ),
                     child: Column(children: [
                       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -151,35 +202,8 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
                             ),
                             const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                            GestureDetector(
-                              onTap: () => _showPickupNoteBottomSheet(context, rideController),
-                              child: rideController.pickupNoteText.isNotEmpty ?
-                              Row(children: [
-                                Expanded(child: Container(
-                                  padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                                  decoration: BoxDecoration(
-                                    color: context.customThemeColors.infoColor.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                                  ),
-                                  child: Row(children: [
-                                    const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                                    Expanded(
-                                      child: Text(rideController.pickupNoteText, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                        style: textRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
-                                      ),
-                                    ),
-                                    const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                                    GestureDetector(
-                                      onTap: () => rideController.clearPickupNote(),
-                                      child: Icon(Icons.close, color: Theme.of(context).disabledColor, size: 16),
-                                    ),
-                                  ]),
-                                )),
-                                ],
-                              ) : Text('+ ${"add_pickup_note".tr}', style: textRegular.copyWith(color: Theme.of(context).primaryColor, fontSize: Dimensions.fontSizeSmall)),
-                            ),
+                            // Where exactly the driver finds the customer: written, or a voice note.
+                            const PickupHelpRow(),
 
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeExtraSmall,),
@@ -253,19 +277,19 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
                                 InkWell(
                                   onTap: () => locationController.setExtraRoute(),
                                   child: Container(
-                                    height: 35,width: 35,
+                                    height: 46, width: 46,
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor,
-                                      borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall),
+                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(Dimensions.radiusLarge - 2),
                                     ),
-                                    child: const Icon(Icons.add, color: Colors.white),
+                                    child: Icon(Icons.add_rounded, color: Theme.of(context).primaryColor),
                                   ),
                                 ),
                             ]),
                             const SizedBox(height: Dimensions.paddingSizeDefault),
 
                             locationController.addEntrance ?
-                            SizedBox(width: 200, height: 40, child: InputField(
+                            SizedBox(width: 200, child: InputField(
                               showSuffix: false,
                               controller: locationController.entranceController,
                               node: locationController.entranceNode,
@@ -333,10 +357,23 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
                         color: Get.isDarkMode ?
                         Theme.of(context).canvasColor :
                         Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(Dimensions.paddingSizeDefault),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Theme.of(context).hintColor.withValues(alpha: 0.18)),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 10)),
+                        ],
                       ),
+                      clipBehavior: Clip.antiAlias,
                       margin: EdgeInsets.fromLTRB(30, dialogTopPosition, 30, 0),
-                      child: ListView.builder(
+                      // Fits above the keyboard and scrolls: the needs on top
+                      // must never push the places out of reach.
+                      constraints: BoxConstraints(maxHeight: _resultsMaxHeight(context)),
+                      child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      // What the customer seems to need ("pharmacie", "bus Douala"),
+                      // above the places, when typing where a ride should go.
+                      if (_smartSearch && locationController.locationType == LocationType.to)
+                        NeedResults(text: locationController.destinationLocationController.text),
+                      ListView.builder(
                         itemCount: locationController.predictionList?.data?.suggestions?.length ?? 0,
                         shrinkWrap: true,
                         padding: EdgeInsets.zero,
@@ -359,7 +396,22 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
                                 horizontal: Dimensions.paddingSizeSmall,
                               ),
                               child: Row(children: [
-                                const Icon(Icons.location_on),
+                                Container(
+                                  width: 32, height: 32,
+                                  margin: const EdgeInsets.only(right: Dimensions.paddingSizeSmall),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).hintColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    switch (locationController.predictionList?.data?.suggestions?[index].placePrediction?.types?.firstOrNull) {
+                                      'landmark' => Icons.signpost_rounded,
+                                      'saved_place' => Icons.bookmark_rounded,
+                                      _ => Icons.place_rounded,
+                                    },
+                                    size: 18, color: Theme.of(context).primaryColor,
+                                  ),
+                                ),
 
                                 Expanded(child: Text(
                                   locationController.predictionList?.data?.suggestions?[index].placePrediction?.text?.text ?? '',
@@ -375,6 +427,7 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
                           );
                         },
                       ),
+                      ])),
                     ),
                   ),
                 ) ,
@@ -405,78 +458,6 @@ class _SetDestinationScreenState extends State<SetDestinationScreen> {
     }
     setState(() {});
   }
-
-  void _showPickupNoteBottomSheet(BuildContext context, RideController rideController) {
-    showModalBottomSheet(context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + Dimensions.paddingSizeLarge,
-          left: Dimensions.paddingSizeLarge,
-          right: Dimensions.paddingSizeLarge,
-          top: Dimensions.paddingSizeDefault,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(height: 7, width: 30, decoration: BoxDecoration(
-                color: Theme.of(context).highlightColor,
-                borderRadius: BorderRadius.circular(Dimensions.paddingSizeExtraSmall),
-              )),
-            ),
-
-            Align(
-              alignment: Alignment.topRight,
-              child: GestureDetector(
-                onTap: () => Get.back(),
-                child: Container(
-                  decoration: BoxDecoration(
-                      color: Theme.of(context).disabledColor.withAlpha(50),
-                      shape: BoxShape.circle
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    Icons.close,
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                    size: Dimensions.paddingSizeDefault,
-                  ),
-                ),
-              ),
-            ),
-
-            Text(
-              rideController.pickupNoteText.isEmpty ? 'add_pickup_note'.tr : 'update_pickup_note'.tr,
-              style: textRegular.copyWith(fontSize: Dimensions.fontSizeDefault),
-            ),
-            const SizedBox(height: Dimensions.paddingSizeSmall),
-
-            CustomTextField(
-              controller: rideController.pickupNoteController,
-              maxLines: 3,
-              borderRadius: Dimensions.radiusSmall,
-              hintText: 'type_here_the_pickup_note...'.tr,
-              contentPadding: EdgeInsets.all(Dimensions.paddingSizeSmall),
-              maxLength: 100,
-            ),
-            const SizedBox(height: Dimensions.paddingSizeExtremeLarge),
-
-            ButtonWidget(
-              radius: Dimensions.paddingSizeSmall,
-              buttonText: rideController.pickupNoteText.isEmpty ? 'save'.tr : 'update'.tr,
-              onPressed: () {
-                rideController.setPickupNote();
-                Get.back();
-              },
-            ),
-            const SizedBox(height: Dimensions.paddingSizeSmall),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _LocationFromToWidget extends StatelessWidget {
@@ -490,14 +471,17 @@ class _LocationFromToWidget extends StatelessWidget {
           padding:  const EdgeInsets.fromLTRB(Dimensions.paddingSizeSmall,Dimensions.paddingSizeLarge, 0, 0),
           child: Column(children: [
             SizedBox(
-              width: Dimensions.iconSizeLarge,
-              child: Image.asset(
-                Images.currentLocation,
-                color: Theme.of(context).textTheme.bodyMedium!.color,
-              ),
+              width: Dimensions.iconSizeLarge, height: Dimensions.iconSizeLarge,
+              child: Center(child: Container(
+                width: 14, height: 14,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Theme.of(context).primaryColor, width: 3),
+                ),
+              )),
             ),
 
-            SizedBox(height: rideController.pickupNoteText.isNotEmpty ? 100:80, width: 10, child: CustomDivider(
+            SizedBox(height: !rideController.hasPickupHelp ? 108 : (rideController.voiceNote != null ? 150 : 116), width: 10, child: CustomDivider(
               height: 8, dashWidth: .75,
               axis: Axis.vertical,
               color: Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.5),
@@ -510,9 +494,10 @@ class _LocationFromToWidget extends StatelessWidget {
                 transform: Get.find<LocalizationController>().isLtr ?
                 Matrix4.rotationY(0) :
                 Matrix4.rotationY(math.pi),
-                child: Image.asset(
-                  Images.activityDirection,
-                  color: Theme.of(context).textTheme.bodyMedium!.color,
+                child: Icon(
+                  Icons.location_on_rounded,
+                  size: 22,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
                 ),
               ),
             ),

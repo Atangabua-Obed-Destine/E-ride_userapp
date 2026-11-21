@@ -5,8 +5,9 @@ import 'package:ride_sharing_user_app/util/images.dart';
 
 class AppConstants {
   static const String appName = 'E-Ride';
-  static const String baseUrl = 'http://192.168.137.1/e-ride';
-  static const double appVersion = 3.2; /// Flutter SDK 3.41.9
+  static const String baseUrl = 'https://eride.innovakickstarter.com';
+  static const double appVersion = 3.3; /// Flutter SDK 3.44.7
+  static const String googleServerClientId = '76471554747-k8l4iefl236bq751f8lacsh28ron2leu.apps.googleusercontent.com';
   static const String fontFamily = 'SFProText';
   static const double coverageRadiusInMeter = 50;
   static const String configUri = '/api/customer/configuration';
@@ -20,16 +21,18 @@ class AppConstants {
   static const String resetPassword = '/api/customer/auth/reset-password';
   static const String changePassword = '/api/user/change-password';
   static const String forgetPassword = '/api/customer/auth/forget-password';
-  static const String socialLogin = '/api/customer/auth/social-login';
   static const String profileInfo = '/api/customer/info';
   static const String updateProfileInfo = '/api/customer/update/profile';
   static const String bannerUei = '/api/customer/banner/list?limit=100&offset=1';
   static const String bannerCountUpdate = '/api/customer/banner/update-redirection-count';
   static const String vehicleMainCategory = '/api/customer/vehicle/category?limit=100&offset=1';
+  static const String moveVehicleCategory = '/api/customer/vehicle/category?limit=100&offset=1&service=move';
   static const String getZone = '/api/customer/config/get-zone-id';
   static const String geoCodeURI = '/api/customer/config/geocode-api';
   static const String searchLocationUri = '/api/customer/config/place-api-autocomplete';
   static const String placeApiDetails = '/api/customer/config/place-api-details';
+  // Landmarks: saved places and the most used landmarks, before anything is typed.
+  static const String landmarksStart = '/api/customer/landmarks/start';
   static const String estimatedFare = '/api/customer/ride/get-estimated-fare';
   static const String rideRequest = '/api/customer/ride/create';
   static const String addNewAddress = '/api/customer/address/add';
@@ -69,6 +72,9 @@ class AppConstants {
   static const String parcelUnpaidList = '/api/customer/ride/unpaid-parcel-list?limit=100&offset=1';
   static const String getDriverLocation = '/api/user/get-live-location?trip_request_id=';
   static const String findChannelRideStatus = '/api/customer/chat/find-channel';
+  static const String chatMarkRead = '/api/customer/chat/mark-read';
+  static const String chatTyping = '/api/customer/chat/typing';
+  static const String chatUnreadSummary = '/api/customer/chat/unread-summary';
   static const String getPaymentMethods = '/api/customer/config/get-payment-methods';
   static const String rideCancellationReasonList = '/api/customer/config/cancellation-reason-list';
   static const String customerAppliedCoupon = '/api/customer/applied-coupon';
@@ -95,13 +101,70 @@ class AppConstants {
   static const String storeLastLocationAPI = '/api/user/store-live-location';
   static const String undoSafetyAlert = '/api/customer/safety-alert/undo/';
   static const String readNotification = '/api/user/read-notification';
+  /// Unread notifications in all and per part of E-Ride; mark all read (all, or one group).
+  static const String notificationCounts = '/api/user/notification-counts';
+  static const String readAllNotifications = '/api/user/read-all-notifications';
   static const String updateScheduleTrip = '/api/customer/ride/edit-scheduled-trip/';
   static const String getRunningRideList = '/api/customer/ride/pending-ride-list';
   static const String getAddFundPromotionalList = '/api/customer/wallet/bonus-list';
   static const String digitalAddFund = '/api/customer/wallet/add-fund-digitally';
+
+  // Food & Shops (backend Modules/StoreManagement)
+  static const String storeList = '/api/customer/stores';
+  /// Everything in progress or needing the customer, for the floating activity button.
+  static const String customerActivity = '/api/customer/activity';
+  /// Ask E-Ride and the info sheets.
+  static const String assistantBase = '/api/customer/assistant';
+  static const String assistantHelp = '/api/customer/assistant/help';
+  static const String assistantAsk = '/api/customer/assistant/ask';
+  static const String assistantVoiceTrip = '/api/customer/assistant/voice-trip';
+  static const String storeOrderQuote = '/api/customer/store-orders/quote';
+  static const String storeOrders = '/api/customer/store-orders';
+  static const String storeOrderAttention = '/api/customer/store-orders/attention';
+
+  // Explore Bamenda (backend Modules/PlaceManagement): categories, then /{category}
+  static const String explore = '/api/customer/explore';
+  // The city and tour guide: Things to do, a place's guide and ratings, tours.
+  static const String guideThings = '/api/customer/things';
+  static const String guidePlaces = '/api/customer/places';
+  static const String guideTours = '/api/customer/tours';
+  // Homes & spaces (Explore Bamenda): places to rent listed by customers.
+  static const String listings = '/api/customer/listings';
+  static const String listingVisits = '/api/customer/listing-visits';
+  /// E-Ride Market: shops, items, the buyer-seller chat (one base path).
+  static const String market = '/api/customer/market';
+  /// E-Ride Bus Travel: search, seat maps, seat requests, tickets (one base path).
+  static const String bus = '/api/customer/bus';
+  /// Partner hotels: a hotel's rooms for some dates, questions and chats with the reception.
+  static const String hotel = '/api/customer/hotel';
+  /// E-Ride ID Verified: the person's ID card or passport with a selfie, checked once (for all of E-Ride).
+  static const String idVerification = '/api/customer/id-verification';
+  /// E-Ride Jobs: verified jobs, the Work Card, applications, employers (one base path).
+  static const String jobs = '/api/customer/jobs';
+  static const String listingAlerts = '/api/customer/listing-alerts';
+  // Homes & spaces reservation money: {id}/wallet, pay-url, cancel, respond, moved-in, problem, refund-to-momo.
+  static const String listingReservations = '/api/customer/listing-reservations';
+  static const String tripDeposit = '/api/customer/ride/deposit/';
+  static const String tripReportReasons = '/api/customer/trip-report/reasons';
+  static const String tripReport = '/api/customer/trip-report';
+  static const String healthRidePlaces = '/api/customer/health-rides/places';
+  static const String lostItems = '/api/customer/lost-items';
+  // E-Ride Move
+  static const String movePhotos = '/api/customer/move/photos';
+  static const String moveDirectory = '/api/customer/move/directory';
+  static const String moveDirectoryContact = '/api/customer/move/directory/'; // {listingId}/contact
+  static const String moveBase = '/api/customer/move/'; // {tripId}/no-agreement
   static const String rideTrackingUrl = '/api/track/';
+  // Share trip
+  static const String tripShare = '/api/customer/ride/'; // {tripId}/share
+  static const String trustedContacts = '/api/customer/trusted-contacts';
+  // Area pause and danger reports: /meta, /nearby, /report.
+  static const String areaSafety = '/api/customer/safety';
+  static const String tripCheckin = '/api/customer/trip-checkin';
   static const String registrationFromOtp = '/api/customer/auth/registration-from-otp';
   static const String otpLoginAfterUpdateData = '/api/customer/auth/update-data';
+  static const String socialLoginCheckUri = '/api/customer/auth/social-login';
+  static const String socialLoginRegistration = '/api/customer/auth/registration-from-social';
 
 
 
@@ -116,6 +179,9 @@ class AppConstants {
   static const String haveOngoingRides = 'have_ongoing_rides';
   static const String userPassword = 'user_password';
   static const String userAddress = 'user_address';
+  /// The last /configuration and profile that loaded: the app opens with them and refreshes behind.
+  static const String savedConfig = 'saved_config';
+  static const String savedProfile = 'saved_profile';
   static const String userNumber = 'user_number';
   static const String loginCountryCode = 'login_country_code';
   static const String searchAddress = 'search_address';
@@ -157,7 +223,7 @@ class AppConstants {
 
   static List<LanguageModel> languages = [
     LanguageModel(imageUrl: Images.unitedKingdom, languageName: 'English', countryCode: 'US', languageCode: 'en',),
-    LanguageModel(imageUrl: Images.placeholder, languageName: 'Français', countryCode: 'FR', languageCode: 'fr',),
+    LanguageModel(imageUrl: Images.france, languageName: 'Français', countryCode: 'FR', languageCode: 'fr',),
   ];
 
 
@@ -182,6 +248,10 @@ class AppConstants {
 
   static const List<String> allowedImageExtensionsForFile = [
     'csv', 'doc','jpeg','jpg','pdf','png','webp','xlsx', 'docx', 'zip'
+  ];
+
+  static const List<String> allowedAudioExtensionsForFile = [
+    'm4a', 'mp3', 'wav', 'aac', 'ogg', 'opus', 'wma', 'flac'
   ];
 
   static List<OnBoardingModel> onBoardPagerData = [

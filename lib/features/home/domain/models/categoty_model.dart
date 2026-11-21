@@ -50,14 +50,20 @@ class Category {
   String? id;
   String? name;
   String? image;
+  /// car, motor_bike, or an E-Ride Move type (tricycle, pickup, dyna, truck).
+  String? type;
+  /// For E-Ride Move: what the vehicle fits ("A 2-bedroom flat").
+  String? description;
   List<Fare>? fare;
 
-  Category({this.id, this.name, this.image, this.fare});
+  Category({this.id, this.name, this.image, this.type, this.description, this.fare});
 
   Category.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     name = json['name'];
     image = json['image'];
+    type = json['type']?.toString();
+    description = json['description']?.toString();
     if (json['fare'] != null) {
       fare = <Fare>[];
       json['fare'].forEach((v) {

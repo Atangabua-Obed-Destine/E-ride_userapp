@@ -1,11 +1,18 @@
 class Images {
   static const String logo = 'assets/image/logo.png';
   static const String splashLogo = 'assets/image/splash_logo.png';
+  /// Dark-background variants. The shipped logo.png mixes near-black and white
+  /// artwork, so it is only ever fully legible on a mid-tone; these map the
+  /// greyscale parts to white and keep the brand red, for the splash and the
+  /// native launch screens.
+  static const String logoOnDark = 'assets/image/logo_on_dark.png';
+  static const String brandMarkOnDark = 'assets/image/brand_mark_on_dark.png';
   static const String signUpScreenLogo = 'assets/image/sign_up_logo.png';
   static const String otpScreenLogo = 'assets/image/otp_screen_logo.png';
   static const String forgotPasswordLogo = 'assets/image/forgot_password.png';
   static const String saudi = 'assets/image/saudi.png';
   static const String unitedKingdom = 'assets/image/united_kingdom.png';
+  static const String france = 'assets/image/france.png';
   static const String placeholder = 'assets/image/placeholder.jpg';
   static const String personPlaceholder = 'assets/image/person_placeholder.png';
   static const String cameraPlaceholder = 'assets/image/camera_placeholder.png';
@@ -49,6 +56,16 @@ class Images {
   static const String bike = 'assets/image/bike.png';
   static const String car = 'assets/image/car.png';
   static const String parcel = 'assets/image/parcel.png';
+  static const String foodShop = 'assets/image/food_shop.png';
+  static const String stay = 'assets/image/stay.png';
+  // Home service tiles, drawn large for the bigger tiles.
+  static const String rideTile = 'assets/image/ride_tile.png';
+  static const String foodTile = 'assets/image/food_tile.png';
+  static const String parcelTile = 'assets/image/parcel_tile.png';
+  static const String stayTile = 'assets/image/stay_tile.png';
+  static const String scheduleTile = 'assets/image/schedule_tile.png';
+  static const String exploreTile = 'assets/image/explore_tile.png';
+  static const String moveTile = 'assets/image/move_tile.png';
   static const String calenderIcon = 'assets/image/calender_icon.png';
   static const String currentLocation = 'assets/image/current_location.png';
   static const String activityDirection = 'assets/image/activity_direction.png';
@@ -104,6 +121,7 @@ class Images {
   static const String cancelIcon = 'assets/image/cancel_icon.png';
   static const String folder = 'assets/image/folder.png';
   static const String bikeTop = 'assets/image/bike_top.png';
+  static const String truckTop = 'assets/image/truck_top.png';
   static const String waitingPrice = 'assets/image/waiting_price.png';
   static const String idleHourIcon = 'assets/image/idle_hour_icon.png';
   static const String farePrice = 'assets/image/fare_price.png';
@@ -220,6 +238,9 @@ class Images {
   static const String xlsIcon = 'assets/image/xls.png';
   static const String xlsxIcon = 'assets/image/xlsx.png';
   static const String shareLocationBtn = 'assets/image/share_right.png';
+  static const String appleLogo = 'assets/image/apple_logo.png';
+  static const String facebookLogo = 'assets/image/facebook_logo.png';
+  static const String googleLogo = 'assets/image/google_logo.png';
 
 
 

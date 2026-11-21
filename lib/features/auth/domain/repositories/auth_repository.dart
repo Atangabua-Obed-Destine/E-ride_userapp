@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/data/api_client.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/models/sign_up_body.dart';
+import 'package:ride_sharing_user_app/features/auth/domain/models/social_log_in_body.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/repositories/auth_repository_interface.dart';
 import 'package:ride_sharing_user_app/util/app_constants.dart';
 import 'package:ride_sharing_user_app/features/address/domain/models/address_model.dart';
@@ -200,6 +201,7 @@ class AuthRepository implements AuthRepositoryInterface{
     }catch(e) {
     }
     apiClient.updateHeader(token, address);
+    sharedPreferences.remove(AppConstants.savedProfile);
     return await sharedPreferences.setString(AppConstants.token, token);
 
   }
@@ -219,6 +221,7 @@ class AuthRepository implements AuthRepositoryInterface{
   bool clearSharedData() {
     sharedPreferences.remove(AppConstants.token);
     sharedPreferences.remove(AppConstants.userAddress);
+    sharedPreferences.remove(AppConstants.savedProfile);
     return true;
   }
 
@@ -365,5 +368,45 @@ class AuthRepository implements AuthRepositoryInterface{
      additionalFiles ?? [],
      additionalData: bodyData
    );
+  }
+
+  @override
+  Future<dynamic> registrationFromSocialLogin(SignUpBody signUpBody, {Map<String, dynamic>? additionalData, List<MultipartBody>? additionalFiles}) async{
+
+    Map<String, String> body = <String, String> {
+      'first_name': signUpBody.fName ?? '',
+      'last_name': signUpBody.lName ?? '',
+      "phone" : signUpBody.phone ?? '',
+      "password" : signUpBody.password ?? '',
+      "confirm_password" : signUpBody.confirmPassword ?? '',
+      "referral_code" : signUpBody.referralCode ?? '',
+      "email" : signUpBody.email ?? '',
+      "medium": signUpBody.loginMedium ?? '',
+    };
+
+    Map<String, String> bodyData = {};
+
+    additionalData?.forEach((key, value){
+      if(value is String){
+        bodyData['additional_data[$key]'] = value;
+      }else if(value is List<dynamic>){
+        for(int i = 0 ; i< value.length ; i++){
+          bodyData['additional_data[$key][$i]'] = value[i];
+        }
+      }
+    });
+
+   return await apiClient.postMultipartData(
+     AppConstants.socialLoginRegistration,
+     body,
+     MultipartBody('', null),
+     additionalFiles ?? [],
+     additionalData: bodyData
+   );
+  }
+
+  @override
+  Future<dynamic> loginWithSocialMedia(SocialLogInBody socialLogInBody) async{
+    return await apiClient.postData(AppConstants.socialLoginCheckUri, socialLogInBody.toJson());
   }
 }

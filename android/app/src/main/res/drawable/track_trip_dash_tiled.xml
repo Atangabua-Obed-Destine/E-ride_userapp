@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Horizontally-tiled dash. A shape-stroke dash renders SOLID inside notification
+     RemoteViews (hardware acceleration), so we tile a small dash PNG which renders
+     reliably as an even dashed line like the screenshot. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/dash_tile"
+    android:tileModeX="repeat"
+    android:tileModeY="disabled"
+    android:gravity="center_vertical|fill_horizontal" />

@@ -12,6 +12,22 @@ class NotificationRepository implements NotificationRepositoryInterface{
     return await apiClient.getData('${AppConstants.notificationList}$offset');
   }
 
+  /// One part of E-Ride only when [group] is given (trips, market, jobs...).
+  @override
+  Future<Response> getGroupList({int offset = 1, String? group}) async {
+    return await apiClient.getData('${AppConstants.notificationList}$offset${group != null ? '&group=$group' : ''}');
+  }
+
+  @override
+  Future<Response> getCounts() async {
+    return await apiClient.getData(AppConstants.notificationCounts);
+  }
+
+  @override
+  Future<Response> readAll({String? group}) async {
+    return await apiClient.putData(AppConstants.readAllNotifications, {if (group != null) 'group': group});
+  }
+
   @override
   Future<Response> sendReadStatus(int notificationId) async {
     return await apiClient.putData(AppConstants.readNotification, {"notification_id" : notificationId});

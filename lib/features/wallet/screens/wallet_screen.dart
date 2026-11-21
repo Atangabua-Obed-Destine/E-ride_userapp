@@ -9,7 +9,6 @@ import 'package:ride_sharing_user_app/features/wallet/screens/loyality_point_scr
 import 'package:ride_sharing_user_app/features/wallet/widget/animated_expanded_fab_button.dart';
 import 'package:ride_sharing_user_app/features/wallet/widget/animated_fab_button.dart';
 import 'package:ride_sharing_user_app/features/wallet/widget/wallet_money_screen.dart';
-import 'package:ride_sharing_user_app/helper/responsive_helper.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/features/profile/controllers/profile_controller.dart';
@@ -94,7 +93,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     ])
                 ),
 
-                Positioned(top: Get.height * (GetPlatform.isIOS ? ResponsiveHelper.isTab ? 0.08 : 0.15 :  0.11), left: Dimensions.paddingSizeSmall,
+                Positioned(top: AppBarWidget.overlayTop(context), left: Dimensions.paddingSizeSmall,
                   child: SizedBox(height: Get.find<LocalizationController>().isLtr? 45 : 50,
                     width: Get.width-Dimensions.paddingSizeDefault,
                     child: ListView.builder(

@@ -8,7 +8,6 @@ import 'package:ride_sharing_user_app/features/refer_and_earn/controllers/refer_
 import 'package:ride_sharing_user_app/features/refer_and_earn/screens/referral_details_screen.dart';
 import 'package:ride_sharing_user_app/features/refer_and_earn/screens/referral_earning_screen.dart';
 import 'package:ride_sharing_user_app/features/refer_and_earn/widgets/referral_type_button_widget.dart';
-import 'package:ride_sharing_user_app/helper/responsive_helper.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 
@@ -75,7 +74,7 @@ class _ReferAndEarnScreenState extends State<ReferAndEarnScreen> {
                   ])
               ),
 
-              Positioned(top: Get.height * (GetPlatform.isIOS ? ResponsiveHelper.isTab ? 0.08 : 0.15 :  0.11), left: Dimensions.paddingSizeSmall,
+              Positioned(top: AppBarWidget.overlayTop(context), left: Dimensions.paddingSizeSmall,
                 child: SizedBox(height: Get.find<LocalizationController>().isLtr? 45 : 50,
                   width: Get.width-Dimensions.paddingSizeDefault,
                   child: Center(

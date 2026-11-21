@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NOTE: RemoteViews (notification custom layouts) only support a limited set of
+     view classes: FrameLayout, LinearLayout, RelativeLayout, GridLayout, TextView,
+     ImageView, Button, ImageButton, ProgressBar, Chronometer, etc.
+     Plain <View> is NOT supported and breaks inflation, so all decorative
+     dots / lines below are <ImageView> with a shape drawable background. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_trip_notification_card"
+    android:padding="14dp">
+
+    <!-- Header: phase icon + title/subtitle -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/iv_phase_icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_trip_logo"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/notification_icon" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#1A1A1A"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tv_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="#8A9099"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Progress track -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/dot_start"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/dot_trip_start" />
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp">
+
+                <ImageView
+                    android:id="@+id/track_line"
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:layout_gravity="center_vertical"
+                    android:background="@drawable/track_trip_dash_tiled" />
+
+                <ImageView
+                    android:id="@+id/track_line_completed"
+                    android:layout_width="0dp"
+                    android:layout_height="3dp"
+                    android:layout_gravity="center_vertical|start"
+                    android:background="@drawable/track_trip_dash_tiled_teal" />
+
+                <ProgressBar
+                    android:id="@+id/progress_track"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:layout_gravity="center_vertical"
+                    android:max="100"
+                    android:progressDrawable="@drawable/track_trip_progress_fill"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:id="@+id/iv_track_vehicle_icon"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center_vertical|start"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_trip_scooter" />
+            </FrameLayout>
+
+            <ImageView
+                android:id="@+id/dot_end"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/dot_trip_end" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Driver / vehicle info -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/iv_driver_avatar"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_trip_avatar_placeholder" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_driver_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#1A1A1A"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tv_vehicle_info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:textColor="#8A9099"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/iv_vehicle_type_icon"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_trip_scooter_teal" />
+    </LinearLayout>
+
+</LinearLayout>

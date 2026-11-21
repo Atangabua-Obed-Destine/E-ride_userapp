@@ -60,6 +60,18 @@ class FareModel {
   double? extraFareFee;
   String? extraFareReason;
   double? surgeMultiplier;
+  /// Paid after a driver accepts; it counts toward the fare. 0 when none.
+  double bookingDeposit = 0;
+  /// E-Ride Move rows carry no price, only the deposit.
+  bool isMove = false;
+  /// Drop fare: a fixed price for this route and vehicle (no surge, no bidding).
+  bool isDropFare = false;
+  /// Health ride estimate: the normal fare, no surge or extra fare.
+  bool isHealthRide = false;
+  String? dropFareLabel;
+  String? vehicleType;
+  /// The pickup or the destination is in an area E-Ride paused for safety (the ride still goes ahead).
+  String? safetyNotice;
 
 
   FareModel(
@@ -116,6 +128,14 @@ class FareModel {
     extraFareFee = double.tryParse(json['extra_fare_fee'].toString());
     extraFareReason = json['extra_fare_reason'];
     surgeMultiplier = double.tryParse(json['surge_multiplier'].toString());
+    bookingDeposit = double.tryParse('${json['booking_deposit'] ?? 0}') ?? 0;
+    isMove = json['is_move'] == true;
+    isDropFare = json['is_drop_fare'] == true;
+    isHealthRide = json['is_health_ride'] == true;
+    dropFareLabel = json['drop_fare_label']?.toString();
+    vehicleType = json['vehicle_type']?.toString();
+    final notice = json['safety_notice']?.toString().trim();
+    safetyNotice = notice == null || notice.isEmpty ? null : notice;
   }
 
   Map<String, dynamic> toJson() {

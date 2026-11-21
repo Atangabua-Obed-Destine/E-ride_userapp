@@ -1,30 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/features/notification/controllers/notification_controller.dart';
+import 'package:ride_sharing_user_app/features/market/helpers/market_link_helper.dart';
 import 'package:ride_sharing_user_app/features/dashboard/domain/models/navigation_model.dart';
+import 'package:ride_sharing_user_app/features/dashboard/widgets/app_drawer.dart';
+import 'package:ride_sharing_user_app/features/dashboard/widgets/eride_nav_dock.dart';
+import 'package:ride_sharing_user_app/features/dashboard/widgets/quick_book_sheet.dart';
 import 'package:ride_sharing_user_app/features/home/screens/home_screen.dart';
 import 'package:ride_sharing_user_app/features/notification/screens/notification_screen.dart';
 import 'package:ride_sharing_user_app/features/profile/screens/profile_screen.dart';
 import 'package:ride_sharing_user_app/features/trip/screens/trip_screen.dart';
-import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/images.dart';
-import 'package:ride_sharing_user_app/util/styles.dart';
 import 'package:ride_sharing_user_app/features/dashboard/controllers/bottom_menu_controller.dart';
 
 
 class DashboardScreen extends StatefulWidget {
+  /// The dashboard Scaffold owns the drawer, so it draws above the nav dock.
+  /// AppBarWidget's menu button opens it through the dashboard showing now.
+  /// Each dashboard has its own key: Get.offAll builds a new dashboard while
+  /// the old one is still in the tree, and one shared key collided
+  /// ("Duplicate GlobalKey").
+  static GlobalKey<ScaffoldState>? _activeKey;
+  static ScaffoldState? get scaffoldState => _activeKey?.currentState;
+
   const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  final PageStorageBucket bucket = PageStorageBucket();
   @override
   void initState() {
     super.initState();
+    DashboardScreen._activeKey = _scaffoldKey;
+    // An E-Ride Market link that came in before the rider was in the app.
+    WidgetsBinding.instance.addPostFrameCallback((_) => MarketLinkHelper.onAppReady());
+    WidgetsBinding.instance.addObserver(this);
+    // The Notification tab's badge.
+    WidgetsBinding.instance.addPostFrameCallback((_) => Get.find<NotificationController>().loadCounts());
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) Get.find<NotificationController>().loadCounts();
+  }
+
+  @override
+  void dispose() {
+    if (identical(DashboardScreen._activeKey, _scaffoldKey)) DashboardScreen._activeKey = null;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  final PageStorageBucket bucket = PageStorageBucket();
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         activeIcon: Images.notificationActive,
         inactiveIcon: Images.notificationOutline,
         screen: const NotificationScreen(),
+        unreadBadge: true,
       ),
       NavigationModel(
         name: 'profile'.tr,
@@ -59,6 +92,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, val) async {
+        // Only a back that the route refused (didPop == false) is ours to
+        // handle, and with the drawer open it just closes the drawer.
+        if (didPop) return;
+        final ScaffoldState? scaffold = _scaffoldKey.currentState;
+        if (scaffold?.isDrawerOpen ?? false) {
+          scaffold!.closeDrawer();
+          return;
+        }
         if (Get.find<BottomMenuController>().currentTab != 0) {
           Get.find<BottomMenuController>().setTabIndex(0);
           return;
@@ -72,79 +113,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return SafeArea(
           top: false,
           child: Scaffold(
+            key: _scaffoldKey,
             resizeToAvoidBottomInset: false,
+            drawer: const AppDrawer(),
+            drawerEdgeDragWidth: 28,
             body: Stack(children: [
 
-              PageStorage(bucket: bucket, child: item[menuController.currentTab].screen),
-
-              Positioned(child: Align(alignment: Alignment.bottomCenter,
-                child: Padding(padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-                  child: Container(height: 65,
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(20),
-                      color: Theme.of(context).primaryColor,
-                      boxShadow: [BoxShadow(offset: const Offset(0,4), blurRadius: 3, color: Colors.black.withValues(alpha:0.3))],
-                    ),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: generateBottomNavigationItems(menuController, item)),
-                  ),
+              // Home stays mounted behind the other tabs: re-mounting it re-ran
+              // every home request (about 15) on each switch back to it.
+              Offstage(
+                offstage: menuController.currentTab != 0,
+                child: TickerMode(
+                  enabled: menuController.currentTab == 0,
+                  child: PageStorage(bucket: bucket, child: item[0].screen),
                 ),
-              )),
+              ),
+              if (menuController.currentTab != 0)
+                PageStorage(bucket: bucket, child: item[menuController.currentTab].screen),
+
+              Positioned(
+                left: 0, right: 0, bottom: 0,
+                child: ERideNavDock(
+                  items: item,
+                  currentIndex: menuController.currentTab,
+                  onSelect: (index) {
+                    if (index == menuController.currentTab) return;
+                    HapticFeedback.selectionClick();
+                    menuController.setTabIndex(index);
+                  },
+                  onBookTap: () {
+                    HapticFeedback.lightImpact();
+                    QuickBookSheet.show();
+                  },
+                ),
+              ),
 
             ]),
 
           ),
         );
       }),
-    );
-  }
-  
-  List<Widget> generateBottomNavigationItems(BottomMenuController menuController, List<NavigationModel> item) {
-
-    List<Widget> items = [];
-    for(int index = 0; index < item.length; index++) {
-      items.add(Expanded(child: CustomMenuItem(
-        isSelected: menuController.currentTab == index, 
-        name: item[index].name,
-        activeIcon: item[index].activeIcon,
-        inActiveIcon: item[index].inactiveIcon,
-        onTap: () => menuController.setTabIndex(index),
-      )));
-    }
-    return items;
-  }
-
-}
-
-class CustomMenuItem extends StatelessWidget {
-  final bool isSelected;
-  final String name;
-  final String activeIcon;
-  final String inActiveIcon;
-  final VoidCallback onTap;
-
-  const CustomMenuItem({
-    super.key, required this.isSelected, required this.name, required this.activeIcon,
-    required this.inActiveIcon, required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      highlightColor: Colors.transparent,
-      hoverColor: Colors.transparent,
-      onTap: onTap,
-      child: Padding(padding: const EdgeInsets.all(8),
-        child: SizedBox(width: isSelected ? 90 : 50, child: Column(crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
-
-            Image.asset(isSelected ? activeIcon : inActiveIcon, width: Dimensions.menuIconSize, height: Dimensions.menuIconSize,),
-
-            isSelected ? Text(name.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: textRegular.copyWith(color: Colors.white, fontSize: Dimensions.fontSizeExtraSmall)) : const SizedBox(),
-
-          ],
-        )),
-      ),
     );
   }
 

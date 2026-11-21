@@ -3,7 +3,7 @@
 ## What this is
 
 The **customer** app of the E-Ride ride-hailing + parcel-delivery platform (a DriveMond-family
-product, v3.2). It is one of three clients of a single backend:
+product, v3.3). It is one of three clients of a single backend:
 
 - **Backend + admin panel**: a separate Laravel repo at `C:\xampp\htdocs\e-ride`,
   served by XAMPP at `http://localhost/e-ride` (admin panel at `/admin`). It has its own `CLAUDE.md`.
@@ -95,6 +95,13 @@ app restarts mid-ride — check it before assuming a fresh `initial` state.
 Parcel delivery has its own parallel machine, `ParcelDeliveryState` in
 `lib/features/parcel/controllers/parcel_controller.dart`.
 
+**Pickup directions and voice note.** `lib/features/ride/widgets/pickup_help.dart`: on Trip Setup
+(and the parcel sender form) the customer writes where the driver finds them or records a voice
+note. The recording is uploaded first (`AppConstants.assistantVoiceTrip`), the backend keeps it
+for the driver and asks the AI to read it (pickup description, destination, parcel details), and
+its name travels with `rideRequest` as `voice_note` (`RideController.voiceNote`). The driver app
+shows it on the request and on the way to pickup.
+
 ### Realtime
 
 `lib/helper/pusher_helper.dart` uses `dart_pusher_channels` against the backend's **Laravel Reverb**
@@ -120,6 +127,18 @@ Firebase Android options are **hardcoded in `main.dart`** (project `drivevalley-
 mode, minimum app version, available payment methods, and which login methods are enabled. **A
 setting changed in the admin panel reaches the app through this response** — if a feature "isn't
 showing up", check the config payload before the widget code.
+
+## iOS
+
+There is no Mac on the team: iOS is built on Codemagic (`codemagic.yaml`, workflows `ios-device` and
+`ios-simulator`, both unsigned until the Apple Developer account exists). Bundle ID `com.innova.eride`
+(the Android id `com.i_nnova.eride` is not valid on iOS); the live activity extension is
+`com.innova.eride.TripLiveActivity`.
+
+The GitHub repo is public, so the Google Maps key must not reach it: Codemagic builds from the
+`ios-build` branch, a snapshot of the working branch with the key replaced by `MAPS_API_KEY_HERE`
+(the build puts it back from the `MAPS_API_KEY` secret). Publish with
+`bash tool/publish_ios_build.sh`; never push the working branch itself.
 
 ## Conventions & gotchas
 

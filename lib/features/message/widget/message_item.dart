@@ -42,9 +42,9 @@ class MessageItem extends StatelessWidget {
                         fontSize: Dimensions.fontSizeDefault,)),
                   const SizedBox(height: Dimensions.paddingSizeExtraSmall,),
                 
-                  Text(lastMessage.isNotEmpty ? lastMessage : 'send_an_attachment'.tr, style: textMedium.copyWith(fontSize: Dimensions.fontSizeSmall,
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha:0.60) ,
-                  ),overflow: TextOverflow.ellipsis,),
+                  Text(lastMessage.isNotEmpty ? lastMessage : 'send_an_attachment'.tr, style: (unReadCount > 0 ? textBold : textMedium).copyWith(fontSize: Dimensions.fontSizeSmall,
+                    color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: unReadCount > 0 ? 0.95 : 0.60) ,
+                  ),overflow: TextOverflow.ellipsis, maxLines: 1,),
                 
                   const SizedBox(width: Dimensions.paddingSizeSmall,),
                   Text( DateConverter.isoDateTimeStringToDifferentWithCurrentTime(channelUsers?.updatedAt??DateTime.now().toString()),
@@ -55,7 +55,7 @@ class MessageItem extends StatelessWidget {
 
               unReadCount != 0 ?
               Container(height: 20, width: 20, decoration: BoxDecoration(
-                color: Colors.green,
+                color: Theme.of(context).primaryColor,
                 borderRadius: BorderRadius.circular(10)),
                 child: Center(child: Text(unReadCount.toString(), style: textRegular.copyWith(color: Theme.of(context).cardColor)))) : const SizedBox()
 

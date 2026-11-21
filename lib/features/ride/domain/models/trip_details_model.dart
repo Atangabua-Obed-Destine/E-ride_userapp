@@ -1,3 +1,5 @@
+import 'package:ride_sharing_user_app/features/deposit/domain/models/trip_deposit_model.dart';
+import 'package:ride_sharing_user_app/common_widgets/waiting_charge_card.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/enums/refund_status_enum.dart';
 
 class TripDetailsModel {
@@ -64,6 +66,7 @@ class TripDetails {
   String? currentStatus;
   double? paidFare;
   bool? isPaused;
+  TripWaiting? waiting;
   ParcelInformation? parcelInformation;
   String? paymentStatus;
   bool? isLoading;
@@ -84,6 +87,19 @@ class TripDetails {
   String? customerLocationUrl;
   List<String>? pickupProofImages;
   List<String>? deliveryProofImages;
+  /// Booking deposit, when this trip asks for one.
+  TripDeposit? deposit;
+  /// What is left to pay once the deposit counts toward the fare.
+  double? amountDue;
+  bool driverReported = false;
+  /// E-Ride Move: the price is agreed with the driver in person, not in the app.
+  bool isMove = false;
+  /// Drop fare: the rider pays exactly dropFarePrice.
+  bool isDropFare = false;
+  /// Health ride: an urgent ride to care (no bidding, no surge).
+  bool isHealthRide = false;
+  double? dropFarePrice;
+  List<String> movePhotos = [];
 
   TripDetails(
       {this.id,
@@ -240,6 +256,7 @@ class TripDetails {
         : null;
 
     isPaused = json['is_paused'] != null ? (bool.tryParse(json['is_paused'].toString()) ?? (json['is_paused'].toString() == '1')) : null;
+    waiting = json['waiting'] is Map ? TripWaiting.fromJson(Map<String, dynamic>.from(json['waiting'])) : null;
     parcelInformation = json['parcel_information'] != null ? ParcelInformation.fromJson(json['parcel_information']) : null;
     paymentStatus = json['payment_status'];
     isLoading = false;
@@ -257,6 +274,14 @@ class TripDetails {
     pickupNote = json['pickup_note'];
     pickupProofImages = json['pickup_proof_images']?.cast<String>();
     deliveryProofImages = json['delivery_proof_images']?.cast<String>();
+    deposit = TripDeposit.fromJson(json['deposit']);
+    amountDue = double.tryParse('${json['amount_due']}');
+    driverReported = json['driver_reported'] == true;
+    isMove = json['is_move'] == true;
+    isDropFare = json['is_drop_fare'] == true;
+    isHealthRide = json['is_health_ride'] == true;
+    dropFarePrice = double.tryParse('${json['drop_fare_price'] ?? ''}');
+    movePhotos = json['move_photos'] is List ? List<String>.from((json['move_photos'] as List).map((e) => '$e')) : [];
   }
 
 }

@@ -1,5 +1,6 @@
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:ride_sharing_user_app/features/ride/widgets/pickup_help.dart';
 import 'package:get/get.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
@@ -32,12 +33,36 @@ class ParcelInfoWidget extends StatefulWidget {
 }
 
 class _ParcelInfoWidgetState extends State<ParcelInfoWidget> {
+  late final List<FocusNode> _typedNodes;
+
+  // However a field gains focus (a tap, or the keyboard's next key), lift the
+  // sheet: otherwise the keyboard covers the form.
+  void _liftSheetOnFocus() {
+    if (_typedNodes.any((FocusNode node) => node.hasFocus)) {
+      Get.find<ParcelController>().focusOnBottomSheet(widget.expandableKey);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final FocusNode node in _typedNodes) {
+      node.removeListener(_liftSheetOnFocus);
+    }
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
 
     final ParcelController parcelController = Get.find<ParcelController>();
+    _typedNodes = [
+      parcelController.senderContactNode, parcelController.senderNameNode,
+      parcelController.receiverContactNode, parcelController.receiverNameNode,
+    ];
+    for (final FocusNode node in _typedNodes) {
+      node.addListener(_liftSheetOnFocus);
+    }
 
     if(widget.isSender) {
       String? senderPhoneNumber = Get.find<ProfileController>().profileModel?.data?.phone;
@@ -218,9 +243,12 @@ class _ParcelInfoWidgetState extends State<ParcelInfoWidget> {
              hintText: 'type_here_the_pickup_note...'.tr,
              contentPadding: EdgeInsets.all(Dimensions.paddingSizeSmall),
              onTap: () => parcelController.focusOnBottomSheet(widget.expandableKey),
-             maxLength: 100,
+             maxLength: 200,
            );
          }),
+         // Or say it: the driver hears it, and E-Ride fills the receiver from it.
+         const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+         const VoiceNoteRecorder(kind: 'parcel', compact: true),
        ],
         const SizedBox(height: Dimensions.paddingSizeDefault),
 

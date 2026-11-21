@@ -15,6 +15,7 @@ abstract class RideServiceInterface{
         String? parcelCategoryId,
         String? rideRequestType,
         required String? scheduledAt,
+        Map<String, dynamic>? extra,
       });
 
 
@@ -70,12 +71,13 @@ abstract class RideServiceInterface{
         required String? scheduledAt,
         String? rideRequestType,
         double? surgeMultiplier,
-        bool? isFemaleDriverRequired
+        bool? isFemaleDriverRequired,
+        Map<String, dynamic>? extra,
       });
 
   Future<dynamic> getRideDetails(String tripId);
   Future<dynamic> updateScheduleTripTimeDate(String? tripId, String? scheduledAt);
-  Future<dynamic> tripStatusUpdate(String id, String status,String cancellationCause);
+  Future<dynamic> tripStatusUpdate(String id, String status,String cancellationCause, {List<String>? identityMismatchReason});
   Future<dynamic> remainDistance(String requestID);
   Future<dynamic> biddingList(String tripId, int offset);
   Future<dynamic> nearestDriverList(String  lat, String lng);

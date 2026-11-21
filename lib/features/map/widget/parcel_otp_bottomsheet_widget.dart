@@ -1,8 +1,10 @@
+import 'package:ride_sharing_user_app/features/area_safety/widgets/area_safety_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
 import 'package:ride_sharing_user_app/common_widgets/expandable_bottom_sheet.dart';
 import 'package:ride_sharing_user_app/common_widgets/swipable_button_widget/slider_button_widget.dart';
+import 'package:ride_sharing_user_app/features/deposit/widgets/deposit_widgets.dart';
 import 'package:ride_sharing_user_app/features/map/widget/parcel_cancelation_list.dart';
 import 'package:ride_sharing_user_app/features/parcel/controllers/parcel_controller.dart';
 import 'package:ride_sharing_user_app/features/parcel/widgets/otp_widget.dart';
@@ -16,6 +18,7 @@ import 'package:ride_sharing_user_app/features/trip/controllers/trip_controller.
 import 'package:ride_sharing_user_app/features/trip/screens/trip_details_screen.dart';
 import 'package:ride_sharing_user_app/features/trip/widgets/rider_details.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
+import 'package:ride_sharing_user_app/features/trip_share/widgets/share_trip_card.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
 
@@ -36,15 +39,24 @@ class _ParcelOtpBottomSheetWidgetState extends State<ParcelOtpBottomSheetWidget>
       return GetBuilder<RideController>(builder: (rideController){
         return  currentState == 0 ?
         Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,children: [
-          TollTipWidget(title: '${ (rideController.remainingDistanceModel.isNotEmpty)
-              ?  (rideController.remainingDistanceModel[0].duration)?? '0' : '0'} ${'away'.tr}'),
-          const SizedBox(height: Dimensions.paddingSizeDefault),
+          // Waiting for the deposit: the driver sets off once it is paid.
+          if (rideController.tripDetails?.deposit?.isAwaiting ?? false)
+            DepositCard(trip: rideController.tripDetails!)
+          else ...[
+            TollTipWidget(title: '${ (rideController.remainingDistanceModel.isNotEmpty)
+                ?  (rideController.remainingDistanceModel[0].duration)?? '0' : '0'} ${'away'.tr}'),
+            const SizedBox(height: Dimensions.paddingSizeDefault),
 
-          if(Get.find<ConfigController>().config?.otpConfirmationForTrip ?? false)
-          const Center(child: OtpWidget(isParcel: true)),
+            if(Get.find<ConfigController>().config?.otpConfirmationForTrip ?? false)
+            const Center(child: OtpWidget(isParcel: true)),
+            if (rideController.tripDetails != null)
+              DepositCard(trip: rideController.tripDetails!),
+          ],
 
           const ActivityScreenRiderDetails(),
           const SizedBox(height: Dimensions.paddingSizeDefault),
+          const ShareTripCard(),
+          const ReportDangerLink(),
 
           Padding(padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
             child: Text('trip_details'.tr,style: textBold.copyWith(fontSize: Dimensions.fontSizeDefault,color: Theme.of(context).primaryColor),),),
@@ -147,6 +159,7 @@ class _ParcelOtpBottomSheetWidgetState extends State<ParcelOtpBottomSheetWidget>
           ),
           const SizedBox(height: Dimensions.paddingSizeSmall),
 
+          DepositCancelNote(deposit: rideController.tripDetails?.deposit),
           ParcelCancellationList(isOngoing: false,expandableKey: widget.expandableKey),
           const SizedBox(height: Dimensions.paddingSizeLarge),
 

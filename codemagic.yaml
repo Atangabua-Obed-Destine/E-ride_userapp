@@ -1,0 +1,64 @@
+# iOS builds on Codemagic's Macs (there is no Mac on the team). Start them from the Codemagic
+# dashboard: pick the branch and one of the workflows below.
+#
+# Neither workflow signs the app, so no Apple Developer account is needed yet. TestFlight and
+# App Store builds come later, as a third workflow, once the account exists.
+
+definitions:
+  environment: &environment
+    flutter: 3.44.8
+    xcode: latest
+    cocoapods: default
+  scripts:
+    - &packages
+      name: Get packages
+      script: flutter pub get
+    - &maps_key
+      name: Put the Maps key in
+      # The copy of the code on GitHub carries a placeholder instead of the Google Maps key.
+      # Set MAPS_API_KEY (secret) in Codemagic for a build whose maps load; without it the app
+      # still builds.
+      script: |
+        if [ -n "$MAPS_API_KEY" ]; then
+          sed -i '' "s/MAPS_API_KEY_HERE/$MAPS_API_KEY/" ios/Runner/AppDelegate.swift
+        fi
+    - &pods
+      name: Install pods
+      # Podfile.lock in the repo predates most of the plugins; let CocoaPods resolve them afresh.
+      script: |
+        cd ios
+        rm -f Podfile.lock
+        pod install --repo-update
+
+workflows:
+  ios-device:
+    name: iOS build for iPhone (unsigned)
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    environment: *environment
+    scripts:
+      - *packages
+      - *maps_key
+      - *pods
+      - name: Build
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+
+  ios-simulator:
+    name: iOS build for the simulator (to run in a browser)
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    environment: *environment
+    scripts:
+      - *packages
+      - *maps_key
+      - *pods
+      - name: Build
+        script: |
+          flutter build ios --simulator --debug
+          cd build/ios/iphonesimulator
+          zip -qr "$CM_BUILD_DIR/eride-simulator.zip" Runner.app
+    artifacts:
+      - eride-simulator.zip
+      - /tmp/xcodebuild_logs/*.log

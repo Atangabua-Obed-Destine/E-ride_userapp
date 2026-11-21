@@ -49,6 +49,9 @@ class ConfigModel {
   String? martPlayStoreUrl;
   String? martAppStoreUrl;
   bool? referralEarningStatus;
+  /// Ways to pay the admin offers (Mobile Money always): cash and the E-Ride wallet can be off.
+  bool paymentCashStatus = true;
+  bool paymentWalletStatus = true;
   double? androidAppMinimumVersion;
   double? iosAppMinimumVersion;
   String? androidAppUrl;
@@ -71,6 +74,40 @@ class ConfigModel {
   int? afterTripCompleteSafetyFeatureSetTime;
   String? safetyFeatureEmergencyGovtNumber;
   bool? otpConfirmationForTrip;
+  bool? storeOrderingStatus;
+  String? storeServiceLabel;
+  bool? stayStatus;
+  String? stayLabel;
+  bool? exploreStatus;
+  /// Landmarks first in the place search; fixed "drop" prices on popular routes.
+  bool landmarksStatus = false;
+  bool dropFaresStatus = false;
+  // Health rides: urgent rides to care (no surge, no bidding), a few a day.
+  bool healthRideStatus = false;
+  int healthRideDailyLimit = 2;
+  /// A health ride can be booked ahead (when scheduled rides are on).
+  bool healthRideSchedule = false;
+  List<EmergencyNumber> emergencyNumbers = [];
+  // Lost and found: report an item left in the car, up to lostItemsReportDays after a ride.
+  bool lostItemsStatus = false;
+  int lostItemsReportDays = 7;
+  double lostItemsReturnFee = 0;
+  String? exploreLabel;
+  bool? bookingDepositStatus;
+  int? bookingDepositWindowMinutes;
+  /// Scheduled rides: when the deposit is paid. 'accept' (when a driver accepts, with a countdown),
+  /// 'booking' (when booking, before any driver) or 'before_pickup'.
+  String bookingDepositScheduledTiming = 'accept';
+  int bookingDepositScheduledFreeCancelMinutes = 60;
+  /// E-Ride Market: shops riders open and share on WhatsApp.
+  bool marketStatus = false;
+  /// E-Ride Jobs: verified jobs, one-tap apply.
+  bool jobsStatus = false;
+  /// E-Ride Move: trucks booked like rides, price agreed in person.
+  bool moveStatus = false;
+  bool moveDepositStatus = false;
+  int? moveDepositWindowMinutes;
+  bool moveDirectoryStatus = false;
   bool? scheduleTripStatus;
   int? minimumScheduleBookTime;
   String? minimumScheduleBookTimeType;
@@ -83,6 +120,11 @@ class ConfigModel {
   CustomerLoginOptions? customerLoginOptions;
   bool? isRealTimeLocationShareEnable;
   bool? isFemaleRideServiceActive;
+  bool? voiceChatIsEnable;
+  int? notificationArriveTime;
+  bool? enableAutoArrivalNotification;
+  bool? enableDriverIdentifyBeforeOngoing;
+  String? driverVerificationMessage;
   List<AdditionalFieldModel>? additionalFieldList;
 
   ConfigModel(
@@ -168,7 +210,12 @@ class ConfigModel {
         this.customerLoginOptions,
         this.isRealTimeLocationShareEnable,
         this.isFemaleRideServiceActive,
-        this.additionalFieldList
+        this.voiceChatIsEnable,
+        this.additionalFieldList,
+        this.notificationArriveTime,
+        this.enableAutoArrivalNotification,
+        this.enableDriverIdentifyBeforeOngoing,
+        this.driverVerificationMessage
       });
 
   ConfigModel.fromJson(Map<String, dynamic> json) {
@@ -252,6 +299,8 @@ class ConfigModel {
     martBusinessName = json['mart_business_name'];
     martPlayStoreUrl = json['mart_app_url_android'];
     martAppStoreUrl = json['mart_app_url_ios'];
+    paymentCashStatus = json['payment_cash_status'] == null || json['payment_cash_status'] == true || json['payment_cash_status'].toString() == '1';
+    paymentWalletStatus = json['payment_wallet_status'] == null || json['payment_wallet_status'] == true || json['payment_wallet_status'].toString() == '1';
     referralEarningStatus = json['referral_earning_status'] != null ? (bool.tryParse(json['referral_earning_status'].toString()) ?? (json['referral_earning_status'].toString() == '1')) : null;
     androidAppMinimumVersion = double.tryParse(json['app_minimum_version_for_android'].toString());
     androidAppUrl = json['app_url_for_android'];
@@ -275,6 +324,41 @@ class ConfigModel {
     safetyFeatureEmergencyGovtNumber = json['safety_feature_emergency_govt_number'];
     maximumParcelWeightCapacity = double.tryParse(json['maximum_parcel_weight_capacity'].toString());
     otpConfirmationForTrip = json['otp_confirmation_for_trip'] != null ? (bool.tryParse(json['otp_confirmation_for_trip'].toString()) ?? (json['otp_confirmation_for_trip'].toString() == '1')) : null;
+    storeOrderingStatus = json['store_ordering_status'] == true || json['store_ordering_status'].toString() == '1';
+    storeServiceLabel = json['store_service_label']?.toString();
+    stayStatus = json['stay_status'] == true || json['stay_status'].toString() == '1';
+    stayLabel = json['stay_label']?.toString();
+    exploreStatus = json['explore_status'] == true || json['explore_status'].toString() == '1';
+    landmarksStatus = json['landmarks_status'] == true || '${json['landmarks_status']}' == '1';
+    dropFaresStatus = json['drop_fares_status'] == true || '${json['drop_fares_status']}' == '1';
+    if (json['health_ride'] is Map) {
+      final Map health = json['health_ride'];
+      healthRideStatus = health['status'] == true || '${health['status']}' == '1';
+      healthRideDailyLimit = int.tryParse('${health['daily_limit']}') ?? 2;
+      healthRideSchedule = health['schedule'] == true || '${health['schedule']}' == '1';
+      emergencyNumbers = [
+        for (final n in (health['emergency_numbers'] is List ? health['emergency_numbers'] as List : const []))
+          if (n is Map) EmergencyNumber(label: '${n['label']}', number: '${n['number']}'),
+      ];
+    }
+    if (json['lost_items'] is Map) {
+      final Map lost = json['lost_items'];
+      lostItemsStatus = lost['status'] == true || '${lost['status']}' == '1';
+      lostItemsReportDays = int.tryParse('${lost['report_days']}') ?? 7;
+      lostItemsReturnFee = double.tryParse('${lost['return_fee']}') ?? 0;
+    }
+    exploreLabel = json['explore_label']?.toString();
+    bookingDepositStatus = json['booking_deposit_status'] == true || json['booking_deposit_status'].toString() == '1';
+    bookingDepositWindowMinutes = int.tryParse('${json['booking_deposit_window_minutes']}');
+    final timing = json['booking_deposit_scheduled_timing']?.toString();
+    bookingDepositScheduledTiming = ['accept', 'booking', 'before_pickup'].contains(timing) ? timing! : 'accept';
+    bookingDepositScheduledFreeCancelMinutes = int.tryParse('${json['booking_deposit_scheduled_free_cancel_minutes']}') ?? 60;
+    marketStatus = json['market_status'] == true || json['market_status'].toString() == '1';
+    jobsStatus = json['jobs_status'] == true || json['jobs_status'].toString() == '1';
+    moveStatus = json['move_status'] == true || json['move_status'].toString() == '1';
+    moveDepositStatus = json['move_deposit_status'] == true || json['move_deposit_status'].toString() == '1';
+    moveDepositWindowMinutes = int.tryParse('${json['move_deposit_window_minutes']}');
+    moveDirectoryStatus = json['move_directory_status'] == true || json['move_directory_status'].toString() == '1';
     scheduleTripStatus = json['schedule_trip_status'] != null ? (bool.tryParse(json['schedule_trip_status'].toString()) ?? (json['schedule_trip_status'].toString() == '1')) : null;
     advanceScheduleBookTime = int.tryParse(json['advance_schedule_book_time'].toString());
     advanceScheduleBookTimeType = json['advance_schedule_book_time_type'];
@@ -287,12 +371,17 @@ class ConfigModel {
     customerLoginOptions = json['customer_login_options'] != null ? CustomerLoginOptions.fromJson(json['customer_login_options']) : null;
     isRealTimeLocationShareEnable = json['is_real_time_location_sharing_enabled'] != null ? (bool.tryParse(json['is_real_time_location_sharing_enabled'].toString()) ?? (json['is_real_time_location_sharing_enabled'].toString() == '1')) : null;
     isFemaleRideServiceActive = json['female_only_ride_service'] != null ? (bool.tryParse(json['female_only_ride_service'].toString()) ?? (json['female_only_ride_service'].toString() == '1')) : null;
+    voiceChatIsEnable = json['voice_message_status'] != null ? (bool.tryParse(json['voice_message_status'].toString()) ?? (json['voice_message_status'].toString() == '1')) : null;
     if (json['customer_additional_registration_form_fields'] != null) {
       additionalFieldList = <AdditionalFieldModel>[];
       json['customer_additional_registration_form_fields'].forEach((v) {
         additionalFieldList!.add(AdditionalFieldModel.fromJson(v));
       });
     }
+    notificationArriveTime = json['auto_arrival_notification_time'];
+    enableAutoArrivalNotification = json['auto_arrival_notification'] != null ? (json['auto_arrival_notification'].toString() == '1' || json['auto_arrival_notification'].toString() == 'true') : false;
+    enableDriverIdentifyBeforeOngoing = json['driver_identity_verification'] != null ? (json['driver_identity_verification'].toString() == '1' || json['driver_identity_verification'].toString() == 'true') : false;
+    driverVerificationMessage = json['driver_identity_verification_message'];
   }
 
 }
@@ -504,12 +593,36 @@ class ZoneExtraFare {
 class CustomerLoginOptions {
   bool? manualLogin;
   bool? otpLogin;
+  SocialLogin? socialLogin;
+  bool? socialMediaLogin;
 
-  CustomerLoginOptions({this.manualLogin, this.otpLogin});
+  CustomerLoginOptions({this.manualLogin, this.otpLogin, this.socialLogin, this.socialMediaLogin});
 
   CustomerLoginOptions.fromJson(Map<String, dynamic> json) {
     manualLogin = json['manual_login'] != null ? (bool.tryParse(json['manual_login'].toString()) ?? (json['manual_login'].toString() == '1')) : null;
     otpLogin = json['otp_login'] != null ? (bool.tryParse(json['otp_login'].toString()) ?? (json['otp_login'].toString() == '1')) : null;
+    socialLogin = json['social_login'] != null ? SocialLogin.fromJson(json['social_login']) : null;
+    socialMediaLogin = json['social_media_login'] != null ? (bool.tryParse(json['social_media_login'].toString()) ?? (json['social_media_login'].toString() == '1')) : null;
+  }
+}
+
+class SocialLogin {
+  bool? google;
+  bool? facebook;
+  bool? apple;
+
+  SocialLogin({this.google, this.facebook, this.apple});
+
+  SocialLogin.fromJson(Map<String, dynamic> json) {
+    google = json['google'] != null ? (bool.tryParse(json['google'].toString()) ?? (json['google'].toString() == '1')) : null;
+    facebook = json['facebook'] != null ? (bool.tryParse(json['facebook'].toString()) ?? (json['facebook'].toString() == '1')) : null;
+    apple = json['apple'] != null ? (bool.tryParse(json['apple'].toString()) ?? (json['apple'].toString() == '1')) : null;
   }
 
+}
+/// A number the health ride screen offers to call (SAMU, fire brigade, police...).
+class EmergencyNumber {
+  final String label;
+  final String number;
+  const EmergencyNumber({required this.label, required this.number});
 }

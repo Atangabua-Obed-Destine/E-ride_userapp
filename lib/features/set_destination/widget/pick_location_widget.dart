@@ -29,11 +29,11 @@ class PickLocationWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 40,
+      height: 46,
       padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+        color: Theme.of(context).hintColor.withValues(alpha: Get.isDarkMode ? 0.16 : 0.08),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge - 2),
       ),
       child: Row(children: [
         const SizedBox(width: Dimensions.paddingSizeExtraSmall),
@@ -42,7 +42,13 @@ class PickLocationWidget extends StatelessWidget {
             focusNode: focusNode,
             controller: textEditingController,
             hint: textFieldHint,
-            onTap: textFieldTap,
+            onTap: () {
+              textFieldTap?.call();
+              // Empty field: offer saved places and landmarks straight away.
+              if (textEditingController.text.trim().isEmpty) {
+                Get.find<LocationController>().showSearchStartList(locationType);
+              }
+            },
             onChanged: (value) async {
               return await Get.find<LocationController>().searchLocation(
                 context, value, type: locationType,
@@ -53,13 +59,21 @@ class PickLocationWidget extends StatelessWidget {
 
         InkWell(
           onTap: locationIconTap,
-          child: Icon(Icons.place_outlined, color: Theme.of(context).primaryColor),
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(Icons.map_outlined, size: 22, color: Theme.of(context).primaryColor),
+          ),
         ),
 
         if(isShowCrossButton)
         InkWell(
           onTap: ()=> Get.find<LocationController>().setExtraRoute(remove: true),
-          child: Icon(Icons.clear, color: Theme.of(context).primaryColor),
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(Icons.close_rounded, size: 20, color: Theme.of(context).hintColor),
+          ),
         ),
 
       ]),

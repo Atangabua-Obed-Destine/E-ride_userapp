@@ -1,117 +1,124 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-	<dict>
-		<key>CADisableMinimumFrameDurationOnPhone</key>
-		<true/>
-		<key>CFBundleDevelopmentRegion</key>
-		<string>$(DEVELOPMENT_LANGUAGE)</string>
-		<key>CFBundleDisplayName</key>
-		<string>E-Ride</string>
-		<key>CFBundleExecutable</key>
-		<string>$(EXECUTABLE_NAME)</string>
-		<key>CFBundleIdentifier</key>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-		<key>CFBundleInfoDictionaryVersion</key>
-		<string>6.0</string>
-		<key>CFBundleName</key>
-		<string>E-Ride</string>
-		<key>CFBundlePackageType</key>
-		<string>APPL</string>
-		<key>CFBundleShortVersionString</key>
-		<string>$(FLUTTER_BUILD_NAME)</string>
-		<key>CFBundleSignature</key>
-		<string>????</string>
-		<key>CFBundleVersion</key>
-		<string>$(FLUTTER_BUILD_NUMBER)</string>
-		<key>LSRequiresIPhoneOS</key>
-		<true/>
-		<key>UIApplicationSupportsIndirectInputEvents</key>
-		<true/>
-		<key>UILaunchStoryboardName</key>
-		<string>LaunchScreen</string>
-		<key>UIMainStoryboardFile</key>
-		<string>Main</string>
-		<key>NSCameraUsageDescription</key>
-		<string>This app need camera access for taking photo for user profile picture.</string>
-		<key>NSPrivacyAccessedAPITypes</key>
-		<string>This app need location permission for tracking driver start to destination trip.</string>
-		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>This app needs access to location for pick location for creating a ride request, Then driver can pickup you.</string>
-		<key>NSLocationAlwaysUsageDescription</key>
-		<string>This app needs access to location for pick location for creating a ride request, Then driver can pickup you</string>
-		<key>NSPhotoLibraryUsageDescription</key>
-		<string>This app need photo gallery access for taking photo for user profile picture.</string>
-		<key>NSMicrophoneUsageDescription</key>
-		<string>Need microphone access for uploading photos</string>
-		<key>NSSpeechRecognitionUsageDescription</key>
-		<string>Permission required to record audio for speech recognition</string>
-		<key>NSMicrophoneUsageDescription</key>
-		<string>Permission required to record audio for speech recognition</string>
-		<key>UIBackgroundModes</key>
-		<array>
-			<string>fetch</string>
-			<string>remote-notification</string>
-		</array>
-		<key>UISupportedInterfaceOrientations</key>
-		<array>
-			<string>UIInterfaceOrientationPortrait</string>
-			<string>UIInterfaceOrientationLandscapeLeft</string>
-			<string>UIInterfaceOrientationLandscapeRight</string>
-		</array>
-		<key>UISupportedInterfaceOrientations~ipad</key>
-		<array>
-			<string>UIInterfaceOrientationPortrait</string>
-			<string>UIInterfaceOrientationPortraitUpsideDown</string>
-			<string>UIInterfaceOrientationLandscapeLeft</string>
-			<string>UIInterfaceOrientationLandscapeRight</string>
-		</array>
-		<key>UIViewControllerBasedStatusBarAppearance</key>
-		<false/>
-		<key>CFBundleURLTypes</key>
-		<array>
-			<dict>
-				<key>CFBundleURLName</key>
-				<string>com.sixamtech.hexarideuser</string>
-				<key>CFBundleURLSchemes</key>
-				<array>
-					<string>drivemond</string>
-				</array>
-			</dict>
-		</array>
-		<key>CFBundleURLTypes</key>
-		<array>
-			<dict>
-				<key>CFBundleTypeRole</key>
-				<string>Editor</string>
-				<key>CFBundleURLSchemes</key>
-				<array>
-					<string>com.googleusercontent.apps.76471554747-3p9dhm14lm8ka1qruonucnaduk5rpsf7</string>
-				</array>
-			</dict>
-		</array>
-		<key>UIApplicationSceneManifest</key>
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>E-Ride</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>E-Ride</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>NSCameraUsageDescription</key>
+    <string>E-Ride uses the camera for your profile photo, photos of what you sell or send, and your ID when you verify your account.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>E-Ride uses your location to set your pickup point, show drivers near you and follow your trip.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+        <string>E-Ride uses your location to set your pickup point, show drivers near you and follow your trip.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>E-Ride lets you choose photos for your profile, for what you sell or send, and for your ID.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>E-Ride uses the microphone to record voice notes for your driver, voice messages and voice search.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>E-Ride turns what you say into text when you search or ask by voice.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>remote-notification</string>
+    </array>
+    <key>NSSupportsLiveActivities</key>
+    <true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
 		<dict>
-			<key>UIApplicationSupportsMultipleScenes</key>
-			<false/>
-			<key>UISceneConfigurations</key>
-			<dict>
-				<key>UIWindowSceneSessionRoleApplication</key>
-				<array>
-					<dict>
-						<key>UISceneClassName</key>
-						<string>UIWindowScene</string>
-						<key>UISceneDelegateClassName</key>
-						<string>FlutterSceneDelegate</string>
-						<key>UISceneConfigurationName</key>
-						<string>flutter</string>
-						<key>UISceneStoryboardFile</key>
-						<string>Main</string>
-					</dict>
-				</array>
-			</dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.innova.eride</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>eride</string>
+				<!-- fb{Facebook App ID}: replace when Facebook login is set up -->
+				<string>fbYOUR_FACEBOOK_APP_ID</string>
+				<!-- REVERSED_CLIENT_ID from GoogleService-Info.plist: replace when Google sign-in is set up -->
+				<string>YOUR_REVERSED_CLIENT_ID_HERE</string>
+			</array>
 		</dict>
-		<key>UIStatusBarHidden</key>
-		<false/>
-	</dict>
+	</array>
+        <key>FacebookAppID</key>
+    	<string>YOUR_FACEBOOK_APP_ID</string>
+    	<key>FacebookClientToken</key>
+    	<string>YOUR_FACEBOOK_CLIENT_TOKEN</string>
+    	<key>FacebookDisplayName</key>
+    	<string>E-Ride</string>
+    	<key>LSApplicationQueriesSchemes</key>
+    	<array>
+            <string>whatsapp</string>
+            <string>fbapi</string>
+            <string>fb-messenger-share-api</string>
+            <string>fbauth2</string>
+            <string>fbshareextension</string>
+    	</array>
+
+    	<key>UIApplicationSceneManifest</key>
+           <dict>
+                <key>UIApplicationSupportsMultipleScenes</key>
+                  <false/>
+                    <key>UISceneConfigurations</key>
+                    <dict>
+                    <key>UIWindowSceneSessionRoleApplication</key>
+                    <array>
+                    <dict>
+                    <key>UISceneClassName</key>
+                    <string>UIWindowScene</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>FlutterSceneDelegate</string>
+                    <key>UISceneConfigurationName</key>
+                    <string>flutter</string>
+                    <key>UISceneStoryboardFile</key>
+                    <string>Main</string>
+                     </dict>
+                    </array>
+                </dict>
+           </dict>
+
+</dict>
 </plist>

@@ -18,6 +18,10 @@ class ApiClient extends GetxService {
   final SharedPreferences sharedPreferences;
   static final String noInternetMessage = 'connection_to_api_server_failed'.tr;
   final int timeoutInSeconds = 30;
+  // One client for the app's lifetime, so requests reuse a kept-alive connection.
+  // The top-level http.get/post opened a new one each time: a fresh TCP and TLS
+  // handshake to the server (about 0.6 s on Cameroon networks) before every call.
+  final http.Client _http = http.Client();
 
   late String token;
   late Map<String, String> _mainHeaders;
@@ -57,11 +61,18 @@ class ApiClient extends GetxService {
 
   Future<Response> getData(String uri, {Map<String, dynamic>? query, Map<String, String>? headers}) async {
     try {
-      if(kDebugMode) {
-        print('====> API Call: $uri\nHeader: $_mainHeaders');
+      Uri url = Uri.parse(appBaseUrl+uri);
+      if(query != null && query.isNotEmpty) {
+        url = url.replace(queryParameters: {
+          ...url.queryParameters,
+          ...query.map((key, value) => MapEntry(key, value.toString())),
+        });
       }
-      http.Response response = await http.get(
-        Uri.parse(appBaseUrl+uri),
+      if(kDebugMode) {
+        print('====> API Call: ${url.toString().replaceFirst(appBaseUrl, '')}\nHeader: $_mainHeaders');
+      }
+      http.Response response = await _http.get(
+        url,
         headers: headers ?? _mainHeaders,
       ).timeout(Duration(seconds: timeoutInSeconds));
       return handleResponse(response, uri);
@@ -76,7 +87,7 @@ class ApiClient extends GetxService {
         print('====> API Call: $uri\nHeader: $_mainHeaders');
         print('====> API Body: $body');
       }
-      http.Response response = await http.post(
+      http.Response response = await _http.post(
         Uri.parse(appBaseUrl+uri),
         body: jsonEncode(body),
         headers: headers ?? _mainHeaders,
@@ -97,7 +108,9 @@ class ApiClient extends GetxService {
     request.headers.addAll(headers ?? _mainHeaders);
 
     if(otherFile != null) {
-      request.files.add(http.MultipartFile('files[${multipartBody!.length}]', otherFile.readStream!, otherFile.size, filename: basename(otherFile.name)));
+      String fileExtension = extension(otherFile.name).replaceFirst('.', '').toLowerCase();
+      bool isAudio = AppConstants.allowedAudioExtensionsForFile.contains(fileExtension);
+      request.files.add(http.MultipartFile(isAudio ? 'voice_message' : 'files[${multipartBody!.length}]', otherFile.readStream!, otherFile.size, filename: basename(otherFile.name)));
     }
     if(multipartBody!=null){
       for(MultipartBody multipart in multipartBody) {
@@ -108,7 +121,7 @@ class ApiClient extends GetxService {
       }
     }
     request.fields.addAll(body);
-    http.Response response = await http.Response.fromStream(await request.send());
+    http.Response response = await http.Response.fromStream(await _http.send(request));
     return handleResponse(response, uri);
   }
 
@@ -155,7 +168,7 @@ class ApiClient extends GetxService {
       }
 
       request.fields.addAll(body);
-      http.Response response = await http.Response.fromStream(await request.send());
+      http.Response response = await http.Response.fromStream(await _http.send(request));
       return handleResponse(response, uri);
 
     } catch (e) {
@@ -169,7 +182,7 @@ class ApiClient extends GetxService {
         print('====> API Call: $uri\nHeader: $_mainHeaders');
         print('====> API Body: $body');
       }
-      http.Response response = await http.put(
+      http.Response response = await _http.put(
         Uri.parse(appBaseUrl+uri),
         body: jsonEncode(body),
         headers: headers ?? _mainHeaders,
@@ -185,7 +198,7 @@ class ApiClient extends GetxService {
       if(kDebugMode) {
         print('====> API Call: $uri\nHeader: $_mainHeaders');
       }
-      http.Response response = await http.delete(
+      http.Response response = await _http.delete(
         Uri.parse(appBaseUrl+uri),
         headers: headers ?? _mainHeaders,
       ).timeout(Duration(seconds: timeoutInSeconds));
@@ -217,7 +230,16 @@ class ApiClient extends GetxService {
       localResponse = Response(statusCode: 0, statusText: noInternetMessage);
     }
 
-    log('====> API Response: [${localResponse.statusCode}] $uri\n${localResponse.body}');
+    if (localResponse.statusCode == 429) {
+      // Rate limited: a plain message instead of the raw "Too Many Requests". In the
+      // body too, because several controllers show body['message'] rather than statusText.
+      final String message = 'too_many_requests_try_again'.tr;
+      localResponse = Response(statusCode: 429, body: {'message': message, 'errors': []}, statusText: message);
+    }
+
+    if (kDebugMode) {
+      log('====> API Response: [${localResponse.statusCode}] $uri\n${localResponse.body}');
+    }
 
     return localResponse;
   }

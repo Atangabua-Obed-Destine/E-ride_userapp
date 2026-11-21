@@ -11,7 +11,7 @@ import GoogleMaps
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     FirebaseApp.configure()
-    GMSServices.provideAPIKey("AIzaSyBlrnYeiGNzQByKArJo42VJTSbD-NDzCb0")
+    GMSServices.provideAPIKey("MAPS_API_KEY_HERE")
     if #available(iOS 10.0, *) {
         UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     }
@@ -20,6 +20,9 @@ import GoogleMaps
 
     func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
         GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+        if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "LiveActivityBridge") {
+          LiveActivityBridge.register(with: registrar.messenger())
+        }
       }
 }
 

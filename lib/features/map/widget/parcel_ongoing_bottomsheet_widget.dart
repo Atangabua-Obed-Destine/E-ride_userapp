@@ -1,3 +1,4 @@
+import 'package:ride_sharing_user_app/features/area_safety/widgets/area_safety_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:ride_sharing_user_app/common_widgets/button_widget.dart';
@@ -15,6 +16,7 @@ import 'package:ride_sharing_user_app/features/trip/widgets/rider_details.dart';
 import 'package:ride_sharing_user_app/helper/date_converter.dart';
 import 'package:ride_sharing_user_app/helper/price_converter.dart';
 import 'package:ride_sharing_user_app/localization/localization_controller.dart';
+import 'package:ride_sharing_user_app/features/trip_share/widgets/share_trip_card.dart';
 import 'package:ride_sharing_user_app/util/dimensions.dart';
 import 'package:ride_sharing_user_app/util/styles.dart';
 
@@ -43,6 +45,8 @@ class _ParcelOngoingBottomSheetWidgetState extends State<ParcelOngoingBottomShee
           const SizedBox(height: Dimensions.paddingSizeDefault),
 
           const ActivityScreenRiderDetails(),
+          const ShareTripCard(),
+          const ReportDangerLink(),
           Padding(padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
             child: Text('trip_details'.tr,style: textBold.copyWith(fontSize: Dimensions.fontSizeDefault,color: Theme.of(context).primaryColor),),),
 

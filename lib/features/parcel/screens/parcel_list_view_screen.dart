@@ -8,7 +8,9 @@ import 'package:ride_sharing_user_app/common_widgets/body_widget.dart';
 
 class ParcelListViewScreen extends StatefulWidget {
   final String title;
-  const ParcelListViewScreen({super.key, required this.title});
+  /// Parcels the customer still has to pay for (finished or not), instead of the ongoing ones.
+  final bool unpaid;
+  const ParcelListViewScreen({super.key, required this.title, this.unpaid = false});
 
   @override
   State<ParcelListViewScreen> createState() => _ParcelListViewScreenState();
@@ -23,14 +25,15 @@ class _ParcelListViewScreenState extends State<ParcelListViewScreen> {
         body: BodyWidget(
           appBar: AppBarWidget(title: widget.title.tr),
           body: GetBuilder<ParcelController>(builder: (parcelController){
-            return parcelController.parcelListModel == null || parcelController.parcelListModel!.data!.isEmpty ?
+            final list = widget.unpaid ? parcelController.unpaidParcelListModel : parcelController.parcelListModel;
+            return list == null || (list.data ?? []).isEmpty ?
             const NoDataWidget(title: 'no_trip_found') :
               ListView.builder(
                 padding: EdgeInsets.zero,
                 shrinkWrap: true,
-                itemCount: parcelController.parcelListModel!.data!.length,
+                itemCount: list.data!.length,
                 itemBuilder: (context, index){
-                  return ParcelItem(rideRequest: parcelController.parcelListModel!.data![index],index: index);
+                  return ParcelItem(rideRequest: list.data![index],index: index);
                 }
             );
           }),

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:ride_sharing_user_app/features/move/widgets/move_widgets.dart';
 import 'package:ride_sharing_user_app/features/payment/widget/payment_item_info_widget.dart';
 import 'package:ride_sharing_user_app/features/ride/domain/models/trip_details_model.dart';
 import 'package:ride_sharing_user_app/features/trip/screens/schedule_trip_map_view.dart';
@@ -78,6 +79,26 @@ class TripDetailWidget extends StatelessWidget {
         const SizedBox(height: Dimensions.paddingSizeSmall)
       ],
 
+      // A move: what was moved and the deposit; the price was agreed in person.
+      if (tripDetails.isMove) ...[
+        MoveLoadSummary(trip: tripDetails),
+        const MovePriceRow(),
+        if (tripDetails.deposit != null && ['applied', 'forfeited', 'refunded', 'paid'].contains(tripDetails.deposit!.status)) ...[
+          const SizedBox(height: Dimensions.paddingSizeSmall),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+              border: Border.all(color: Theme.of(context).hintColor.withValues(alpha:0.2)),
+            ),
+            padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+            child: PaymentItemInfoWidget(
+              icon: Images.profileMyWallet,
+              title: 'move_deposit_outcome_${tripDetails.deposit!.status}'.tr,
+              amount: tripDetails.deposit!.status == 'refunded' ? tripDetails.deposit!.refundedAmount : tripDetails.deposit!.amount,
+            ),
+          ),
+        ],
+      ] else ...[
       Row(spacing: Dimensions.paddingSizeExtraSmall, children: [
         Text('billing_summery'.tr, style: textSemiBold),
 
@@ -93,7 +114,7 @@ class TripDetailWidget extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
         child: Column(children: [
-          PaymentItemInfoWidget(icon: Images.farePrice,title: 'fare_fee'.tr,amount: tripDetails.distanceWiseFare ?? 0),
+          PaymentItemInfoWidget(icon: Images.farePrice,title: tripDetails.isDropFare ? 'drop_price_fare'.tr : 'fare_fee'.tr,amount: tripDetails.distanceWiseFare ?? 0),
 
           PaymentItemInfoWidget(icon: Images.idleHourIcon,title: 'idle_price'.tr,amount: tripDetails.idleFee ?? 0),
 
@@ -108,6 +129,16 @@ class TripDetailWidget extends StatelessWidget {
           PaymentItemInfoWidget(icon: Images.farePrice,title: 'tips'.tr,amount: tripDetails.tips ?? 0),
 
           PaymentItemInfoWidget(icon: Images.farePrice,title: 'vat_tax'.tr,amount: tripDetails.vatTax ?? 0),
+
+          // What happened to the booking deposit.
+          if (tripDetails.deposit != null && ['applied', 'forfeited', 'refunded', 'paid'].contains(tripDetails.deposit!.status))
+            PaymentItemInfoWidget(
+              icon: Images.profileMyWallet,
+              title: 'deposit_outcome_${tripDetails.deposit!.status}'.tr,
+              amount: tripDetails.deposit!.status == 'applied' ? tripDetails.deposit!.appliedAmount
+                  : tripDetails.deposit!.status == 'refunded' ? tripDetails.deposit!.refundedAmount
+                  : tripDetails.deposit!.amount,
+            ),
 
           Divider(color: Theme.of(context).hintColor.withValues(alpha:0.15)),
 
@@ -138,6 +169,7 @@ class TripDetailWidget extends StatelessWidget {
           ])
         ]),
       )
+      ],
     ]);
   }
 }

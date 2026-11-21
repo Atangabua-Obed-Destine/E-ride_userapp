@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:ride_sharing_user_app/helper/image_size_helper.dart';
 import 'package:ride_sharing_user_app/util/images.dart';
 
 class ImageWidget extends StatelessWidget {
@@ -18,6 +19,8 @@ class ImageWidget extends StatelessWidget {
         placeholder: (context, url) => Image.asset(placeholder?? Images.placeholder, height: height, width: width, fit: fit?? BoxFit.cover),
         imageUrl: image, fit: fit?? BoxFit.cover,
         height: height,width: width,
+        // Decoded at the size shown, not the full upload.
+        memCacheWidth: ImageSizeHelper.decodeWidth(context, width, height, cover: (fit ?? BoxFit.cover) == BoxFit.cover),
         errorWidget: (c, o, s) => Image.asset(placeholder?? Images.placeholder, height: height, width: width, fit: fit?? BoxFit.cover),
       ),
     );

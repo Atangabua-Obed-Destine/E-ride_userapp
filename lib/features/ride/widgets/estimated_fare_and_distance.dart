@@ -26,6 +26,8 @@ class EstimatedFareAndDistance extends StatelessWidget {
             FareWidget(title: 'distance_away'.tr, value: (rideController.remainingDistanceModel.isNotEmpty) ?
             rideController.remainingDistanceModel[0].distanceText ?? '0' : '0'),
 
+            // A move has no fare in the app.
+            if (!(rideController.tripDetails?.isMove ?? false)) ...[
             VerticalDivider(color: Theme.of(context).hintColor.withValues(alpha: 0.5)),
           
             FareWidget(title: 'fare_fee'.tr, value: PriceConverter.convertPrice(fromPickLocation ?
@@ -34,6 +36,7 @@ class EstimatedFareAndDistance extends StatelessWidget {
             rideController.tripDetails?.discountActualFare ?? 0 :
             rideController.tripDetails?.actualFare ?? 0,
             )),
+            ],
           ]),
         ),
       ) :

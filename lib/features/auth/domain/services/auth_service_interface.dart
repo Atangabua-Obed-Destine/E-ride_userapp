@@ -1,5 +1,6 @@
 import 'package:ride_sharing_user_app/data/api_client.dart';
 import 'package:ride_sharing_user_app/features/auth/domain/models/sign_up_body.dart';
+import 'package:ride_sharing_user_app/features/auth/domain/models/social_log_in_body.dart';
 
 abstract class AuthServiceInterface{
 
@@ -33,5 +34,7 @@ abstract class AuthServiceInterface{
   Future<dynamic> saveRideCreatedTime(DateTime dateTime);
   Future<dynamic> remainingTime();
   Future<dynamic> registrationFromOtp(SignUpBody signUpBody, {required bool updateFromRegistration, Map<String, dynamic>? additionalData, List<MultipartBody>? additionalFiles});
+  Future<dynamic> registrationFromSocialLogin(SignUpBody signUpBody, {Map<String, dynamic>? additionalData, List<MultipartBody>? additionalFiles});
   String getLoginCountryCode(bool externalUser);
+  Future<dynamic> loginWithSocialMedia(SocialLogInBody socialLogInBody);
 }

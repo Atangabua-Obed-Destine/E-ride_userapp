@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:ride_sharing_user_app/features/location/domain/models/place_details_model.dart';
 import 'package:ride_sharing_user_app/features/location/domain/models/prediction_model.dart';
+import 'package:ride_sharing_user_app/features/splash/controllers/config_controller.dart';
 import 'package:ride_sharing_user_app/features/location/domain/models/zone_response.dart';
 import 'package:ride_sharing_user_app/features/location/domain/services/location_service_interface.dart';
 import 'package:ride_sharing_user_app/helper/display_helper.dart';
@@ -16,6 +17,7 @@ import 'package:ride_sharing_user_app/features/home/controllers/category_control
 import 'package:ride_sharing_user_app/features/address/domain/models/address_model.dart';
 import 'package:ride_sharing_user_app/features/map/controllers/map_controller.dart';
 import 'package:ride_sharing_user_app/features/parcel/controllers/parcel_controller.dart';
+import 'package:ride_sharing_user_app/features/ride/controllers/ride_controller.dart';
 import 'package:ride_sharing_user_app/common_widgets/confirmation_dialog_widget.dart';
 
 enum LocationType{from, to, extraOne, extraTwo, location, accessLocation, senderLocation, receiverLocation}
@@ -119,7 +121,81 @@ class LocationController extends GetxController implements GetxService {
   @override
   void onInit(){
     super.onInit();
-    getCurrentLocation();
+    getCurrentLocation().then((_) => syncAddressWithGps());
+  }
+
+  // How far the phone can be from the saved address before it stops being "where you are".
+  static const double _addressDriftMeters = 200;
+  static const double _worstUsableFixMeters = 100;
+  bool _addressPickedByHand = false;
+  DateTime? _lastAddressSync;
+  Future<Address?>? _addressSync;
+
+  /// The saved address is the pickup default, the home header and the zone header, and
+  /// it was only ever set once, so a customer who moved was offered the old place as
+  /// their pickup. Returns the new address when the phone has moved away from it.
+  /// An address the customer chose by hand stands until the next cold start.
+  Future<Address?> syncAddressWithGps() {
+    final DateTime? last = _lastAddressSync;
+    if (last != null && DateTime.now().difference(last) < const Duration(seconds: 30)) {
+      return Future.value(null);
+    }
+    return _addressSync ??= _syncAddressWithGps().whenComplete(() {
+      _addressSync = null;
+      _lastAddressSync = DateTime.now();
+    });
+  }
+
+  Future<Address?> _syncAddressWithGps() async {
+    final Address? saved = getUserAddress();
+    if (_addressPickedByHand || saved?.latitude == null || saved?.longitude == null) return null;
+    // The zone header must not change under a trip in progress.
+    if (Get.find<RideController>().currentRideState != RideState.initial) return null;
+    try {
+      // Never prompts: this runs on its own, not because the customer asked for anything.
+      final LocationPermission permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always && permission != LocationPermission.whileInUse) return null;
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+
+      final Position fix = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 8)),
+      );
+      if (fix.accuracy > _worstUsableFixMeters) return null;
+      final double moved = Geolocator.distanceBetween(saved!.latitude!, saved.longitude!, fix.latitude, fix.longitude);
+      if (moved <= _addressDriftMeters) return null;
+
+      final Response zone = await locationServiceInterface.getZone(fix.latitude.toString(), fix.longitude.toString());
+      if (zone.statusCode != 200 || zone.body['data'] == null || zone.body['data']['id'] == null) return null;
+      final String zoneId = zone.body['data']['id'].toString();
+
+      final Response geocode = await locationServiceInterface.getAddressFromGeocode(LatLng(fix.latitude, fix.longitude));
+      if (geocode.statusCode != 200 || geocode.body['data'] == null) return null;
+      final List<dynamic>? results = geocode.body['data']['results'];
+      if (results == null || results.isEmpty || _addressPickedByHand) return null;
+
+      final Address fresh = Address(
+        latitude: fix.latitude, longitude: fix.longitude,
+        address: results[0]['formatted_address'].toString(), zoneId: zoneId,
+      );
+      await saveUserAddress(fresh);
+      if (zoneId != saved.zoneId) Get.find<CategoryController>().getCategoryList();
+      update();
+      return fresh;
+    } catch (e) {
+      customPrint('address sync: $e');
+      return null;
+    }
+  }
+
+  /// Trip setup opens on the saved address, then moves to the phone's position if it
+  /// has drifted, unless the customer has already changed the pickup themselves.
+  Future<void> refreshPickupFromGps() async {
+    final Address? atOpen = fromAddress;
+    final Address? fresh = await syncAddressWithGps();
+    if (fresh != null && identical(fromAddress, atOpen)) {
+      setPickUp(fresh);
+      update();
+    }
   }
 
 
@@ -187,12 +263,12 @@ class LocationController extends GetxController implements GetxService {
           }
         }
 
-        _locationSubscription = Geolocator.getPositionStream().listen((newLocalData) {
-          if (mapController != null) {
+        // Only for a map on screen: without one this kept the GPS on for nothing.
+        if (mapController != null) {
+          _locationSubscription = Geolocator.getPositionStream().listen((newLocalData) {
             Get.find<MapController>().updateMarkerAndCircle(latLng: LatLng(newLocalData.latitude, newLocalData.longitude));
-
-          }
-        });
+          });
+        }
       }catch(e){
         if (kDebugMode) {
           print(e);
@@ -210,6 +286,11 @@ class LocationController extends GetxController implements GetxService {
   }
 
 
+
+  void stopFollowingPosition() {
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
+  }
 
   Future<LatLng?> getCurrentPosition({GoogleMapController? mapController}) async {
     bool isSuccess = await checkPermission(() {});
@@ -292,6 +373,8 @@ class LocationController extends GetxController implements GetxService {
     return _address;
   }
 
+  int _searchSeq = 0;
+
   Future<List<Suggestions>?> searchLocation(BuildContext context, String text, {LocationType type = LocationType.from, bool fromMap = false}) async {
     locationType = type;
     if(!fromMap) {
@@ -303,7 +386,16 @@ class LocationController extends GetxController implements GetxService {
         setSearchResultShowHide(show: true);
       }
 
-      Response response = await locationServiceInterface.searchLocation(text);
+      // One search per pause in typing, and only the latest one's answer is shown:
+      // a slow answer to an earlier, shorter text used to replace the right list.
+      final int seq = ++_searchSeq;
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (seq != _searchSeq) return _predictionList?.data?.suggestions;
+
+      // Nearby places first: bias the search to the pickup (or saved) point.
+      final Address? near = fromAddress ?? getUserAddress();
+      Response response = await locationServiceInterface.searchLocation(text, lat: near?.latitude, lng: near?.longitude);
+      if (seq != _searchSeq) return _predictionList?.data?.suggestions;
       if (response.statusCode == 200) {
         _predictionList = PredictionModel.fromJson(response.body);
         update();
@@ -311,12 +403,30 @@ class LocationController extends GetxController implements GetxService {
         //customSnackBar(response.body['message'] ?? response.bodyString,isError:false);
       }
     }else{
+      _searchSeq++; // a search still on its way must not reopen the list
       if(!fromMap) {
         setSearchResultShowHide(show: false);
+        showSearchStartList(type);
       }
 
     }
     return _predictionList?.data?.suggestions;
+  }
+
+  /// Nothing typed yet: the rider's saved places and the most used landmarks.
+  Future<void> showSearchStartList(LocationType type) async {
+    if (!(Get.find<ConfigController>().config?.landmarksStatus ?? false)) return;
+    locationType = type;
+    final int seq = ++_searchSeq;
+    final Response response = await locationServiceInterface.getSearchStartList();
+    if (seq != _searchSeq) return; // the rider started typing meanwhile
+    if (response.statusCode == 200 && response.body is Map) {
+      final PredictionModel list = PredictionModel.fromJson(response.body);
+      if (list.data?.suggestions?.isNotEmpty ?? false) {
+        _predictionList = list;
+        setSearchResultShowHide(show: true);
+      }
+    }
   }
 
   void updatePosition(LatLng? positionLatLng, bool fromAddressScreen, LocationType? type) async {
@@ -366,6 +476,7 @@ class LocationController extends GetxController implements GetxService {
 
     setSearchResultShowHide(show: false);
     if(type == LocationType.accessLocation) {
+      _addressPickedByHand = true;
       await saveUserAddress(address);
       Get.find<CategoryController>().getCategoryList();
       Get.find<BottomMenuController>().navigateToDashboard();

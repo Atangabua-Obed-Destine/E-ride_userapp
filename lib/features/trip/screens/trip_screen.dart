@@ -54,24 +54,34 @@ class _TripScreenState extends State<TripScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
               child: GetBuilder<TripController>(builder: (tripController) {
                 return Column(children: [
+                  // Filter pills instead of the underlined tab strip.
                   TabBar(
                     controller: tabController,
-                    unselectedLabelColor: Colors.grey,
                     tabAlignment: TabAlignment.start,
                     isScrollable: true,
-                    labelColor: Get.isDarkMode ? Colors.white.withValues(alpha:0.9) : Theme.of(context).primaryColor,
-                    labelStyle: textSemiBold.copyWith(),
-                    indicator: UnderlineTabIndicator(borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 1)),
-                    dividerHeight: 1,
-                    dividerColor: Theme.of(context).primaryColor.withValues(alpha:0.15),
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Theme.of(context).hintColor,
+                    labelStyle: textSemiBold.copyWith(fontSize: Dimensions.fontSizeSmall),
+                    unselectedLabelStyle: textMedium.copyWith(fontSize: Dimensions.fontSizeSmall),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicatorPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
+                    indicator: BoxDecoration(
+                      color: Theme.of(context).primaryColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    dividerHeight: 0,
+                    splashBorderRadius: BorderRadius.circular(20),
+                    overlayColor: WidgetStateProperty.all(Colors.transparent),
                     tabs: [
-                      Tab(text: 'all_trip'.tr),
-                      Tab(text: 'ongoing'.tr),
-                      Tab(text: 'cancelled'.tr),
-                      Tab(text: 'completed'.tr),
-                      Tab(text: 'returned'.tr)
+                      Tab(height: 44, text: 'all_trip'.tr),
+                      Tab(height: 44, text: 'ongoing'.tr),
+                      Tab(height: 44, text: 'cancelled'.tr),
+                      Tab(height: 44, text: 'completed'.tr),
+                      Tab(height: 44, text: 'returned'.tr)
                     ],
                   ),
+                  const SizedBox(height: Dimensions.paddingSizeSmall),
 
                   Expanded(child: TabBarView(
                       controller: tabController,
@@ -109,7 +119,8 @@ class _TripScreenState extends State<TripScreen> with SingleTickerProviderStateM
           await tripController.getTripList(offset!);
         },
         itemView: Padding(
-          padding: const EdgeInsets.only(bottom: 70.0),
+          // Clears the floating nav dock.
+          padding: const EdgeInsets.only(bottom: 120.0),
           child: ListView.separated(
             itemCount: tripController.tripModel!.data!.length,
             padding: const EdgeInsets.all(0),
@@ -118,7 +129,7 @@ class _TripScreenState extends State<TripScreen> with SingleTickerProviderStateM
             itemBuilder: (BuildContext context, int index) {
               return TripItemView(tripDetails: tripController.tripModel!.data![index]);
             },
-            separatorBuilder: (BuildContext context, int index) => Divider(color: Theme.of(context).highlightColor.withValues(alpha:0.15)),
+            separatorBuilder: (BuildContext context, int index) => const SizedBox(height: Dimensions.paddingSizeSmall),
           ),
         ),
       ),
@@ -127,4 +138,3 @@ class _TripScreenState extends State<TripScreen> with SingleTickerProviderStateM
     const NotificationShimmer();
   }
 }
-

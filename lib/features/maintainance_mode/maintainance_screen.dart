@@ -36,12 +36,9 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> with WidgetsBindi
     if (state == AppLifecycleState.resumed) {
       Get.find<ConfigController>().getConfigData().then((bool isSuccess) {
         if(isSuccess){
-          if(Get.find<ConfigController>().config!.maintenanceMode != null &&
-              Get.find<ConfigController>().config!.maintenanceMode!.maintenanceStatus == 0){
-            Get.offAll(()=> const DashboardScreen());
-          }else if(Get.find<ConfigController>().config!.maintenanceMode != null &&
-              Get.find<ConfigController>().config!.maintenanceMode!.maintenanceStatus == 1 &&
-              Get.find<ConfigController>().config!.maintenanceMode!.selectedMaintenanceSystem!.userApp == 0) {
+          // Leave maintenance as soon as the backend stops reporting it for
+          // this app, whether the flag cleared or only the customer app was freed.
+          if(!Get.find<ConfigController>().isUnderMaintenance) {
             Get.offAll(()=> const DashboardScreen());
           }
         }

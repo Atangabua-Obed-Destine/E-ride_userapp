@@ -26,7 +26,41 @@ class PaymentController extends GetxController implements GetxService{
     ReviewModel(Images.lovely, 'lovely'),
     ReviewModel(Images.superb, 'superb'),
   ];
+  /// Every way to pay, in a fixed order (screens rely on cash 0, digital 1, wallet 2).
+  /// What the customer sees is [shownPaymentTypes]: the admin can turn cash and the wallet off.
   List<String> paymentTypeList = ['cash', 'digital', 'wallet'];
+
+  /// Set by the payment screen for a trip booked with cash: it can still be
+  /// settled in cash after the admin turned cash off (the backend allows it).
+  bool bookedWithCash = false;
+
+  /// Whether the admin offers this way to pay. Mobile Money (digital) always.
+  bool offers(String type) {
+    final config = Get.find<ConfigController>().config;
+    return switch (type) {
+      'cash' => bookedWithCash || (config?.paymentCashStatus ?? true),
+      'wallet' => config?.paymentWalletStatus ?? true,
+      _ => true,
+    };
+  }
+
+  List<String> get shownPaymentTypes => paymentTypeList.where(offers).toList();
+
+  /// Keeps the choice on a way the admin offers (Mobile Money otherwise).
+  void ensureOfferedType() {
+    if (offers(paymentTypeList[paymentTypeIndex])) return;
+    paymentTypeIndex = paymentTypeList.indexOf(shownPaymentTypes.first);
+    paymentType = paymentTypeList[paymentTypeIndex];
+  }
+
+  /// The way to pay to send with a trip: the customer's choice, if still offered.
+  String get offeredPaymentType {
+    ensureOfferedType();
+    return paymentTypeList[paymentTypeIndex];
+  }
+
+  /// Picks a way by name, falling back to the first offered one.
+  void selectPaymentType(String type) => setPaymentType(paymentTypeList.indexOf(offers(type) ? type : shownPaymentTypes.first));
 
 
   bool isLoading = false;
@@ -41,6 +75,7 @@ class PaymentController extends GetxController implements GetxService{
     paymentGatewayIndex = -1;
     paymentTypeIndex = 0;
     tipAmount = '0';
+    ensureOfferedType();
   }
 
   void setReviewType(int index){
@@ -51,7 +86,7 @@ class PaymentController extends GetxController implements GetxService{
   String paymentType = 'cash';
   void setPaymentType(int index) {
     tipAmount = '0';
-    paymentTypeIndex = index;
+    paymentTypeIndex = offers(paymentTypeList[index]) ? index : paymentTypeList.indexOf(shownPaymentTypes.first);
     paymentType = paymentTypeList[paymentTypeIndex];
     paymentServiceInterface.saveLastPaymentType(paymentType);
     update();
@@ -66,7 +101,7 @@ class PaymentController extends GetxController implements GetxService{
     }else{
       paymentTypeIndex = 1;
     }
-
+    ensureOfferedType();
   }
 
   String gateWay = '';
@@ -170,7 +205,7 @@ class PaymentController extends GetxController implements GetxService{
         paymentType = paymentTypeList[i];
       }
     }
-
+    ensureOfferedType();
   }
 
 }

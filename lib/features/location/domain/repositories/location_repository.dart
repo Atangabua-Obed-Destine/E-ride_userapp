@@ -25,8 +25,15 @@ class LocationRepository implements LocationRepositoryInterface{
   }
 
   @override
-  Future<Response> searchLocation(String text) async {
-    return await apiClient.getData('${AppConstants.searchLocationUri}?search_text=${text.replaceAll('#', '')}');
+  Future<Response> searchLocation(String text, {double? lat, double? lng}) async {
+    // lat / lng bias the results towards the rider (nearby places first).
+    final String near = (lat != null && lng != null) ? '&lat=$lat&lng=$lng' : '';
+    return await apiClient.getData('${AppConstants.searchLocationUri}?search_text=${Uri.encodeQueryComponent(text.replaceAll('#', ''))}$near');
+  }
+
+  @override
+  Future<Response> getSearchStartList() async {
+    return await apiClient.getData(AppConstants.landmarksStart);
   }
 
   @override

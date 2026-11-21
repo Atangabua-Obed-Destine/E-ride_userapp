@@ -12,25 +12,30 @@ class ButtonWidget extends StatelessWidget {
   final double? fontSize;
   final double radius;
   final IconData? icon;
+  final String? imageIcon;
   final bool showBorder;
   final double borderWidth;
   final Color? borderColor;
   final Color? textColor;
   final Color? backgroundColor;
   final bool boldText;
-  const ButtonWidget({super.key, this.onPressed,
+  const ButtonWidget({
+    super.key, this.onPressed,
     required this.buttonText,
     this.transparent = false,
     this.margin = EdgeInsets.zero,
     this.width = Dimensions.webMaxWidth, this.height = 45,
     this.fontSize,
-    this.radius = 5, this.icon,
+    this.radius = 5,
+    this.icon,
+    this.imageIcon,
     this.showBorder = false,
     this.borderWidth=1,
     this.borderColor,
     this.textColor,
     this.backgroundColor,
-    this.boldText = true});
+    this.boldText = true
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +64,11 @@ class ButtonWidget extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: Dimensions.paddingSizeExtraSmall),
               child: Icon(icon, color: transparent ? Theme.of(context).primaryColor : Colors.white),
+            ) :
+            imageIcon != null ?
+            Padding(
+              padding: const EdgeInsets.only(right: Dimensions.paddingSizeExtraSmall),
+              child: Image.asset(imageIcon!, height: 20, width: 20),
             ) :
             const SizedBox(),
 
